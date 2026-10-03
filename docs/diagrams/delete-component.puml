@@ -1,0 +1,19 @@
+@startuml
+actor Manager
+participant "Web UI" as UI
+participant "REST API" as API
+participant "Auth/RBAC" as Auth
+participant "Inventory Service" as Inv
+database DB
+Manager -> UI: Confirm deletion
+UI -> API: DELETE /api/inventory/{id}
+API -> Auth: Validate token + role
+Auth --> API: ADMIN/MANAGER
+API -> Inv: Delete component
+Inv -> DB: Mark inactive
+Inv -> DB: Insert audit log
+DB --> Inv: Commit
+Inv --> API: Deleted
+API --> UI: 200 OK
+UI --> Manager: Refresh inventory
+@enduml

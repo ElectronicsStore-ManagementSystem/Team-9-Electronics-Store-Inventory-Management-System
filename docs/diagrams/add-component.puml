@@ -1,0 +1,17 @@
+@startuml
+actor Manager
+participant "Web UI" as UI
+participant "REST API" as API
+participant "Inventory Service" as SVC
+database DB
+Manager -> UI: Submit component form
+UI -> API: POST /api/inventory
+API -> SVC: Validate fields
+SVC -> DB: Generate/check SKU
+DB --> SVC: Unique SKU
+SVC -> DB: Insert component
+DB --> SVC: Created component
+SVC --> API: 201 Created
+API --> UI: Component + SKU
+UI --> Manager: Show new component
+@enduml

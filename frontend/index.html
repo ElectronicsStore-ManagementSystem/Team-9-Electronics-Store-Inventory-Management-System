@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EIMS | Sprint 1</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main class="container">
+    <header><div><h1>EIMS</h1><p>Electronics Store Inventory Management System</p></div><button id="logout" class="hidden">Logout</button></header>
+    <section id="login-card" class="card"><h2>Sign in</h2><form id="login-form"><input id="username" placeholder="Username" required><input id="password" type="password" placeholder="Password" required><button>Login</button></form><small>Demo: admin / Admin@12345 or staff / Staff@12345</small><p id="login-error" class="error"></p></section>
+    <section id="app" class="hidden">
+      <div class="toolbar"><input id="search" placeholder="Search name, SKU or category"><select id="status"><option value="">All stock</option><option value="in-stock">In stock</option><option value="low-stock">Low stock</option><option value="out-of-stock">Out of stock</option></select><button id="refresh">Refresh</button><button id="add-btn" class="hidden">Add component</button></div>
+      <div id="stats" class="stats"></div>
+      <div class="card"><table><thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>Qty</th><th>Price</th><th>Supplier</th><th>Reorder</th><th>Status</th><th>Action</th></tr></thead><tbody id="inventory"></tbody></table></div>
+      <section id="form-card" class="card hidden"><h2>Add component</h2><form id="component-form" class="grid"><input name="name" placeholder="Name" required><input name="category" placeholder="Category" required><input name="quantity" type="number" min="0" placeholder="Quantity" required><input name="unit_price" type="number" min="0" step="0.01" placeholder="Unit price" required><input name="supplier" placeholder="Supplier" required><input name="reorder_level" type="number" min="0" value="5" placeholder="Reorder level" required><button>Add</button><button type="button" id="cancel-add">Cancel</button></form><p id="form-error" class="error"></p></section>
+    </section>
+  </main>
+<script src="/app.js"></script>
+</body></html>

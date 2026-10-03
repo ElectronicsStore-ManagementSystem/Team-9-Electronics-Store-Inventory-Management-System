@@ -1,0 +1,26 @@
+@startuml
+skinparam componentStyle rectangle
+actor "Admin / Manager" as Manager
+actor "Store Staff" as Staff
+component "Web UI" as UI
+component "REST API" as API
+component "Auth & RBAC" as Auth
+component "Inventory Module" as Inv
+component "Report Module" as Report
+component "Dashboard Module" as Dash
+component "Audit Module" as Audit
+database "EIMS Database" as DB
+Manager --> UI
+Staff --> UI
+UI --> API
+API --> Auth
+API --> Inv
+API --> Report
+API --> Dash
+Inv --> Audit
+Auth --> DB
+Inv --> DB
+Report --> DB
+Dash --> DB
+Audit --> DB
+@enduml
