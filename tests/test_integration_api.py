@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 
 def auth(token):
@@ -539,6 +540,69 @@ def test_duplicate_sku_is_impossible_through_create(client, admin_token):
     assert a.status_code == 201
     assert b.status_code == 201
     assert a.json()["sku"] != b.json()["sku"]
+
+
+def test_database_rejects_duplicate_sku_without_modifying_existing_record():
+    from app.db import SessionLocal
+    from app.models import Component
+
+    db = SessionLocal()
+
+    try:
+        original = db.query(Component).filter(
+            Component.active.is_(True)
+        ).first()
+
+        assert original is not None
+
+        original_id = original.id
+        original_sku = original.sku
+        original_name = original.name
+        original_quantity = original.quantity
+
+        duplicate = Component(
+            sku=original_sku,
+            name="Duplicate SKU Test Component",
+            category="Test",
+            quantity=99,
+            unit_price=999.0,
+            supplier="Duplicate Test Supplier",
+            reorder_level=1,
+            active=True,
+        )
+
+        db.add(duplicate)
+
+        with pytest.raises(IntegrityError):
+            db.commit()
+
+        db.rollback()
+
+        # The original record must remain unchanged.
+        db.expire_all()
+
+        unchanged = db.get(Component, original_id)
+
+        assert unchanged is not None
+        assert unchanged.sku == original_sku
+        assert unchanged.name == original_name
+        assert unchanged.quantity == original_quantity
+
+        # No second record with the duplicate SKU should exist.
+        matching_records = (
+            db.query(Component)
+            .filter(Component.sku == original_sku)
+            .all()
+        )
+
+        assert len(matching_records) == 1
+
+    finally:
+        db.rollback()
+        db.close()
+
+
+
 
 
 def test_availability_and_dashboard(client, staff_token):
