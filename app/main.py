@@ -1,10 +1,14 @@
 from pathlib import Path
-from fastapi import Depends, FastAPI, HTTPException, Query
+import io
+import uuid
+
+from fastapi import Depends, FastAPI, HTTPException, Query, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from PIL import Image, UnidentifiedImageError
 from sqlalchemy.orm import Session
 from .bootstrap import initialize_database
 from .db import get_db
@@ -19,8 +23,27 @@ app = FastAPI(title="EIMS API", version="1.0.0")
 if ENFORCE_HTTPS:
     app.add_middleware(HTTPSRedirectMiddleware)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
+
+# Component image upload configuration
+UPLOAD_DIR = Path(__file__).resolve().parent.parent / "uploads" / "components"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
+
+ALLOWED_IMAGE_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
+
 app.mount("/static", StaticFiles(directory=FRONTEND), name="static")
+app.mount(
+    "/uploads",
+    StaticFiles(directory=UPLOAD_DIR.parent),
+    name="uploads",
+)
 
 initialize_database()
 
@@ -123,6 +146,138 @@ def add_component(
             status_code=500,
             detail="The component could not be saved due to a database error.",
         ) from exc
+
+
+@app.post("/api/inventory/{component_id}/image")
+async def upload_component_image(
+    component_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_manager),
+):
+    # Find the existing component.
+    component = repositories.get_active_component(db, component_id)
+
+    if not component:
+        raise HTTPException(
+            status_code=404,
+            detail="Component not found or inactive.",
+        )
+
+    # Check the declared content type.
+    extension = ALLOWED_IMAGE_TYPES.get(file.content_type)
+
+    if extension is None:
+        raise HTTPException(
+            status_code=415,
+            detail="Unsupported image format. Upload a PNG, JPEG, or WebP image.",
+        )
+
+    # Read at most 5 MB plus one byte to detect oversized uploads.
+    contents = await file.read(MAX_IMAGE_SIZE + 1)
+    await file.close()
+
+    if len(contents) > MAX_IMAGE_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail="Image exceeds the maximum allowed size of 5 MB.",
+        )
+
+    if not contents:
+        raise HTTPException(
+            status_code=400,
+            detail="The uploaded image is empty.",
+        )
+
+    # Validate the actual image content, not just its extension.
+    try:
+        with Image.open(io.BytesIO(contents)) as image:
+            actual_format = image.format
+
+            format_extensions = {
+                "JPEG": ".jpg",
+                "PNG": ".png",
+                "WEBP": ".webp",
+            }
+
+            if actual_format not in format_extensions:
+                raise HTTPException(
+                    status_code=415,
+                    detail="Unsupported image format. Upload a PNG, JPEG, or WebP image.",
+                )
+
+            image.verify()
+
+        # Ensure the MIME type matches the actual file format.
+        expected_extensions = {
+            "image/jpeg": {".jpg", ".jpeg"},
+            "image/png": {".png"},
+            "image/webp": {".webp"},
+        }
+
+        actual_extension = format_extensions[actual_format]
+
+        if actual_extension not in expected_extensions[file.content_type]:
+            raise HTTPException(
+                status_code=415,
+                detail="The file content does not match its declared image format.",
+            )
+
+    except UnidentifiedImageError as exc:
+        raise HTTPException(
+            status_code=415,
+            detail="The uploaded file is not a valid image.",
+        ) from exc
+    except (OSError, Image.DecompressionBombError) as exc:
+        raise HTTPException(
+            status_code=415,
+            detail="The uploaded image is invalid or cannot be safely processed.",
+        ) from exc
+
+    # Save under a unique filename.
+    filename = f"{uuid.uuid4().hex}{extension}"
+    destination = UPLOAD_DIR / filename
+
+    try:
+        destination.write_bytes(contents)
+
+        old_image_url = component.image_url
+        component.image_url = f"/uploads/components/{filename}"
+
+        db.commit()
+        db.refresh(component)
+
+    except Exception as exc:
+        db.rollback()
+
+        # Remove only the new file if saving the database change fails.
+        try:
+            if destination.exists():
+                destination.unlink()
+        except OSError:
+            pass
+
+        raise HTTPException(
+            status_code=500,
+            detail="Image upload failed. Existing component details and image were preserved.",
+        ) from exc
+
+    # Delete the previous uploaded image only after the database commit succeeds.
+    if old_image_url and old_image_url.startswith("/uploads/components/"):
+        old_filename = Path(old_image_url).name
+        old_path = UPLOAD_DIR / old_filename
+
+        if old_path != destination and old_path.is_file():
+            try:
+                old_path.unlink()
+            except OSError:
+                pass
+
+    return {
+        "message": "Image uploaded successfully.",
+        "component_id": component.id,
+        "image_url": component.image_url,
+    }
 
 @app.get("/api/inventory/{component_id}", response_model=ComponentResponse)
 def get_component(

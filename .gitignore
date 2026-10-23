@@ -10,3 +10,7 @@ htmlcov/
 .idea/
 .vscode/
 .DS_Store
+
+# Uploaded component images (runtime files)
+uploads/components/*
+!uploads/components/.gitkeep
