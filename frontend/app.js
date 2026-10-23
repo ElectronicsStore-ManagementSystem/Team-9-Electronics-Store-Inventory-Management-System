@@ -799,7 +799,39 @@ function renderComponentDetails(component) {
     ? '<button class="details-edit-button" type="button" data-edit-component>Edit details</button>'
     : '';
 
+  const imageSection = component.image_url
+  ? `
+    <div class="component-image-section">
+      <img
+        class="component-image"
+        src="${escapeHTML(component.image_url)}"
+        alt="${escapeHTML(component.name)}"
+        loading="lazy"
+      >
+    </div>
+  `
+  : '<p class="no-component-image">No image uploaded yet.</p>';
+
+const imageUploadSection = ['ADMIN', 'MANAGER'].includes(role)
+  ? `
+    <form id="component-image-form" class="component-image-form">
+      <label for="component-image-file">Component image (PNG, JPEG, or WebP; max 5 MB)</label>
+      <input
+        id="component-image-file"
+        name="file"
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        required
+      >
+      <p id="component-image-feedback" class="form-feedback" role="status" aria-live="polite"></p>
+      <button type="submit">Upload image</button>
+    </form>
+  `
+  : '';  
+
   details.innerHTML = `
+        ${imageSection}
+      ${imageUploadSection}
     <p class="component-detail-category">${escapeHTML(component.category)}</p>
     <dl class="details-grid">
       <div class="detail-item detail-name">
@@ -834,6 +866,61 @@ function renderComponentDetails(component) {
     </dl>
     ${editButton}
   `;
+  const imageForm = $('component-image-form');
+
+if (imageForm) {
+  imageForm.addEventListener('submit', async event => {
+    event.preventDefault();
+
+    const fileInput = $('component-image-file');
+    const feedback = $('component-image-feedback');
+    const file = fileInput.files[0];
+
+    if (!file) {
+      feedback.textContent = 'Please select an image.';
+      return;
+    }
+
+    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
+
+    if (!allowedTypes.includes(file.type)) {
+      feedback.textContent = 'Unsupported format. Please choose a PNG, JPEG, or WebP image.';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      feedback.textContent = 'Image must be 5 MB or smaller.';
+      return;
+    }
+
+    const submitButton = imageForm.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    feedback.textContent = 'Uploading image...';
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const result = await api(
+        `/api/inventory/${component.id}/image`,
+        {
+          method: 'POST',
+          body: formData
+        }
+      );
+
+      feedback.textContent = result.message || 'Image uploaded successfully.';
+
+      // Reload the component to display its latest saved image.
+      currentComponent = await api(`/api/inventory/${component.id}`);
+      renderComponentDetails(currentComponent);
+    } catch (error) {
+      feedback.textContent = `Image upload failed: ${error.message}`;
+    } finally {
+      submitButton.disabled = false;
+    }
+  });
+}
 }
 
 function renderComponentEditForm(component, errorMessage = '') {
