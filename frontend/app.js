@@ -21,15 +21,26 @@ async function api(path, options = {}) {
     } catch {
       // Response was not JSON.
     }
-
-    const message = Array.isArray(data.detail)
+     const message = Array.isArray(data.detail)
       ? data.detail.map(issue => issue.msg).join(', ')
       : data.detail;
-    throw new Error(message || `HTTP ${response.status}`);
+
+    const error = new Error(
+      typeof message === 'string' && message
+        ? message
+        : `HTTP ${response.status}`
+    );
+
+    error.status = response.status;
+    error.details = Array.isArray(data.detail) ? data.detail : [];
+
+    throw error;
+
   }
 
   return response.json();
 }
+
 
 // ==================== LOGIN / LOGOUT ====================
 
@@ -178,6 +189,103 @@ $('clear-filters').onclick = () => {
   refresh();
 };
 
+const componentFields = [
+  'name',
+  'category',
+  'quantity',
+  'unit_price',
+  'supplier',
+  'reorder_level'
+];
+
+const fieldLabels = {
+  name: 'Component name',
+  category: 'Category',
+  quantity: 'Quantity',
+  unit_price: 'Unit price',
+  supplier: 'Supplier',
+  reorder_level: 'Reorder level'
+};
+
+function clearFieldErrors() {
+  componentFields.forEach(name => {
+    const input = document.querySelector(
+      `#component-form [name="${name}"]`
+    );
+
+    const error = $(`${name}-error`);
+
+    if (input) {
+      input.classList.remove('invalid-field');
+      input.removeAttribute('aria-invalid');
+      input.setCustomValidity('');
+    }
+
+    if (error) {
+      error.textContent = '';
+    }
+  });
+
+  $('form-error').textContent = '';
+}
+
+function showFieldError(name, message) {
+  const input = document.querySelector(
+    `#component-form [name="${name}"]`
+  );
+
+  const error = $(`${name}-error`);
+
+  if (input) {
+    input.classList.add('invalid-field');
+    input.setAttribute('aria-invalid', 'true');
+    input.setCustomValidity(message);
+  }
+
+  if (error) {
+    error.textContent = message;
+  }
+}
+
+function displayValidationErrors(details) {
+  let displayedFieldError = false;
+
+  details.forEach(detail => {
+    const location = detail.loc || [];
+    const fieldName = location[location.length - 1];
+
+    if (!componentFields.includes(fieldName)) {
+      return;
+    }
+
+    const messages = {
+      missing: `${fieldLabels[fieldName]} is required.`,
+      string_too_short: `${fieldLabels[fieldName]} cannot be empty.`,
+      greater_than_equal:
+        `${fieldLabels[fieldName]} must be zero or greater.`,
+      int_parsing: `${fieldLabels[fieldName]} must be a whole number.`,
+      float_parsing: `${fieldLabels[fieldName]} must be a valid number.`,
+      int_type: `${fieldLabels[fieldName]} must be a whole number.`,
+      float_type: `${fieldLabels[fieldName]} must be a valid number.`
+    };
+
+    showFieldError(
+      fieldName,
+      messages[detail.type] || detail.msg || 'Please check this field.'
+    );
+
+    displayedFieldError = true;
+  });
+
+  if (!displayedFieldError) {
+    $('form-error').textContent =
+      'Please check the component details and try again.';
+  } else {
+    $('form-error').textContent =
+      'Please correct the highlighted fields and try again.';
+  }
+}
+
 // ==================== ADD COMPONENT FORM ====================
 
 $('add-btn').onclick = () => {
@@ -205,11 +313,19 @@ for (const fieldName of Object.keys(addTextFields)) {
 }
 
 // Add component
+// Add component
 $('component-form').onsubmit = async event => {
   event.preventDefault();
-  $('form-error').textContent = '';
+
+  clearFieldErrors();
 
   const form = event.target;
+
+  // Run native browser validation first.
+  if (!form.reportValidity()) {
+    return;
+  }
+
   for (const [fieldName, label] of Object.entries(addTextFields)) {
     const field = form.elements.namedItem(fieldName);
     field.value = field.value.trim();
@@ -218,10 +334,15 @@ $('component-form').onsubmit = async event => {
     );
   }
 
-  if (!form.reportValidity()) return;
+  if (!form.reportValidity()) {
+    return;
+  }
 
   const data = Object.fromEntries(new FormData(form).entries());
 
+  data.name = data.name.trim();
+  data.category = data.category.trim();
+  data.supplier = data.supplier.trim();
   data.quantity = Number(data.quantity);
   data.unit_price = Number(data.unit_price);
   if (data.reorder_level === '') {
@@ -234,6 +355,57 @@ $('component-form').onsubmit = async event => {
   submitButton.disabled = true;
   submitButton.textContent = 'Saving...';
 
+  // Validate text fields before making an API request.
+  let hasErrors = false;
+
+  ['name', 'category', 'supplier'].forEach(name => {
+    if (!data[name]) {
+      showFieldError(
+        name,
+        `${fieldLabels[name]} is required.`
+      );
+
+      hasErrors = true;
+    }
+  });
+
+  if (!Number.isInteger(data.quantity) || data.quantity < 0) {
+    showFieldError(
+      'quantity',
+      'Quantity must be a whole number greater than or equal to 0.'
+    );
+
+    hasErrors = true;
+  }
+
+  if (!Number.isFinite(data.unit_price) || data.unit_price < 0) {
+    showFieldError(
+      'unit_price',
+      'Unit price must be a valid number greater than or equal to 0.'
+    );
+
+    hasErrors = true;
+  }
+
+  if (
+    !Number.isInteger(data.reorder_level) ||
+    data.reorder_level < 0
+  ) {
+    showFieldError(
+      'reorder_level',
+      'Reorder level must be a whole number greater than or equal to 0.'
+    );
+
+    hasErrors = true;
+  }
+
+  if (hasErrors) {
+    $('form-error').textContent =
+      'Please correct the highlighted fields and try again.';
+
+    return;
+  }
+
   try {
     const component = await api('/api/inventory', {
       method: 'POST',
@@ -242,6 +414,8 @@ $('component-form').onsubmit = async event => {
     });
 
     form.reset();
+    clearFieldErrors();
+    
     $('form-card').classList.add('hidden');
     $('add-feedback').textContent =
       `${component.name} added successfully (SKU: ${component.sku}).`;
@@ -255,10 +429,15 @@ $('component-form').onsubmit = async event => {
     $('sort-order').value = 'asc';
     await refresh();
   } catch (error) {
-    $('form-error').textContent = error.message;
+    if (error.status === 422) {
+      displayValidationErrors(error.details);
+    } else {
+      $('form-error').textContent =
+        error.message || 'Unable to save the component. Please try again.';
+    }
   } finally {
     submitButton.disabled = false;
-    submitButton.textContent = 'Save component';
+    submitButton.textContent = 'Add component';
   }
 };
 

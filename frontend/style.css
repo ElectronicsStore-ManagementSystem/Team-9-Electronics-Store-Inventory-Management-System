@@ -1004,3 +1004,19 @@ button.hidden {
     animation-duration: 0.01ms !important;
   }
 }
+
+
+
+.invalid-field {
+  border: 2px solid #dc2626 !important;
+  outline: none;
+}
+
+.field-error {
+  display: block;
+  margin-top: 4px;
+  color: #dc2626;
+  font-size: 0.85rem;
+}
+
+

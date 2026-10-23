@@ -240,7 +240,11 @@
               type="text"
               placeholder="Enter component name"
               required
-            >
+              maxlength="120"
+              aria-describedby="name-error"
+  >
+  <span id="name-error" class="field-error" aria-live="polite"></span>
+            
           </label>
 
           <label>
@@ -250,7 +254,11 @@
               type="text"
               placeholder="Enter category"
               required
+            minlength="1"
+    maxlength="120"
+    aria-describedby="category-error"
             >
+         <span id="category-error" class="field-error" aria-live="polite"></span>   
           </label>
 
           <label>
@@ -261,7 +269,12 @@
               min="0"
               placeholder="Enter quantity"
               required
-            >
+              minlength="1"
+    maxlength="120"
+    aria-describedby="quantity-error"
+  >
+  <span id="quantity-error" class="field-error" aria-live="polite"></span>
+            
           </label>
 
           <label>
@@ -273,7 +286,11 @@
               step="0.01"
               placeholder="Enter unit price"
               required
+              minlength="1"
+    maxlength="120"
+    aria-describedby="unit_price-error"
             >
+          <span id="unit_price-error" class="field-error" aria-live="polite"></span>
           </label>
 
           <label>
@@ -283,7 +300,12 @@
               type="text"
               placeholder="Enter supplier name"
               required
+            minlength="1"
+    maxlength="120"
+    aria-describedby="supplier-error" 
             >
+    <span id="supplier-error" class="field-error" aria-live="polite"></span>
+ 
           </label>
 
           <label>
@@ -294,6 +316,11 @@
               min="0"
               value="5"
             >
+            <span
+  id="reorder_level-error"
+  class="field-error"
+  aria-live="polite"
+></span>
           </label>
 
           <div class="form-actions">
