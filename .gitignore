@@ -5,6 +5,7 @@ __pycache__/
 *.db
 *.sqlite3
 .env
+.env.example
 .coverage
 htmlcov/
 .idea/
@@ -14,3 +15,9 @@ htmlcov/
 # Uploaded component images (runtime files)
 uploads/components/*
 !uploads/components/.gitkeep
+
+# Documents and generated reports
+*.pdf 
+*.doc 
+*.docx
+docs/
