@@ -3,41 +3,22 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
-from .db import Base, engine, get_db, SessionLocal
+from .bootstrap import initialize_database
+from .db import get_db
 from .models import AuditLog, Component, User
 from .schemas import ComponentCreate, ComponentResponse, ComponentUpdate, DashboardResponse, AvailabilityResponse, LoginRequest, LoginResponse
-from .security import create_access_token, get_current_user, hash_password, require_manager, verify_password
-from .services import next_sku, stock_status, validate_search
+from .security import create_access_token, get_current_user, require_manager, verify_password
+from .services import stock_status, validate_search
+from . import repositories
 
-Base.metadata.create_all(bind=engine)
 app = FastAPI(title="EIMS API", version="1.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 app.mount("/static", StaticFiles(directory=FRONTEND), name="static")
 
-def seed():
-    db = SessionLocal()
-    try:
-        if db.scalar(select(User).where(User.username == "admin")):
-            return
-        db.add_all([
-            User(username="admin", password_hash=hash_password("Admin@12345"), role="ADMIN"),
-            User(username="staff", password_hash=hash_password("Staff@12345"), role="STAFF"),
-        ])
-        db.flush()
-        db.add_all([
-            Component(sku="EIMS-00001", name="Arduino Uno", category="Microcontroller", quantity=18, unit_price=650, supplier="TechSource", reorder_level=5),
-            Component(sku="EIMS-00002", name="ESP32 Dev Board", category="Microcontroller", quantity=4, unit_price=520, supplier="TechSource", reorder_level=5),
-            Component(sku="EIMS-00003", name="220 Ohm Resistor", category="Passive", quantity=0, unit_price=2.5, supplier="CircuitHub", reorder_level=20),
-        ])
-        db.commit()
-    finally:
-        db.close()
-
-seed()
+initialize_database()
 
 @app.get("/", include_in_schema=False)
 def home():
@@ -49,7 +30,7 @@ def health():
 
 @app.post("/api/auth/login", response_model=LoginResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(User.username == payload.username.strip()))
+    user = repositories.find_user_by_username(db, payload.username.strip())
     if not user or not user.active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     return LoginResponse(access_token=create_access_token(user), role=user.role)
@@ -80,52 +61,20 @@ def list_inventory(
     category = validate_search(category)
     supplier = validate_search(supplier)
 
-    query = select(Component).where(Component.active.is_(True))
-
-    if search:
-        term = f"%{search}%"
-        query = query.where(
-            or_(
-                Component.name.ilike(term),
-                Component.sku.ilike(term),
-                Component.category.ilike(term),
-            )
+    try:
+        components = repositories.list_components(
+            db,
+            search=search,
+            category=category,
+            supplier=supplier,
+            sort=sort,
+            allow_date_sort=user.role == "ADMIN",
         )
-
-    if category:
-        query = query.where(Component.category == category)
-
-    if supplier:
-        query = query.where(Component.supplier == supplier)
-
-    descending = sort.startswith("-")
-    sort_field = sort[1:] if descending else sort
-
-    sort_options = {
-        "quantity": Component.quantity,
-        "unit_price": Component.unit_price,
-        "price": Component.unit_price,
-        "id": Component.id,
-    }
-    if user.role == "ADMIN":
-        sort_options.update({
-            "date_added": Component.created_at,
-            "date": Component.created_at,
-        })
-
-    sort_column = sort_options.get(sort_field)
-
-    if sort_column is None:
+    except ValueError as exc:
         raise HTTPException(
             status_code=422,
             detail="Unsupported inventory sort field",
-        )
-
-    query = query.order_by(
-        sort_column.desc() if descending else sort_column.asc(),
-        Component.id.asc(),
-    )
-    components = list(db.scalars(query))
+        ) from exc
 
     if status:
         components = [
@@ -143,23 +92,10 @@ def add_component(
     user: User = Depends(require_manager),
 ):
     try:
-        sku = next_sku(db)
-
-        if not sku or not sku.startswith("EIMS-"):
-            raise HTTPException(
-                status_code=500,
-                detail="Unable to generate a valid component SKU.",
-            )
-
-        component = Component(
-            sku=sku,
-            **payload.model_dump(),
+        component = repositories.create_component(
+            db,
+            payload.model_dump(),
         )
-
-        db.add(component)
-        db.commit()
-        db.refresh(component)
-
         return component
 
     except HTTPException:
@@ -186,8 +122,8 @@ def get_component(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
-    component = db.get(Component, component_id)
-    if not component or not component.active:
+    component = repositories.get_active_component(db, component_id)
+    if not component:
         raise HTTPException(status_code=404, detail="Component not found")
     return component_response_data(component, user)
 
@@ -198,16 +134,16 @@ def update_component(
     db: Session = Depends(get_db),
     user: User = Depends(require_manager),
 ):
-    component = db.get(Component, component_id)
-    if not component or not component.active:
+    component = repositories.get_active_component(db, component_id)
+    if not component:
         raise HTTPException(status_code=404, detail="Component not found")
 
-    for key, value in payload.model_dump(exclude_none=True).items():
-        setattr(component, key, value)
-
     try:
-        db.commit()
-        db.refresh(component)
+        component = repositories.update_component(
+            db,
+            component,
+            payload.model_dump(exclude_none=True),
+        )
     except SQLAlchemyError as exc:
         db.rollback()
         raise HTTPException(
@@ -219,17 +155,25 @@ def update_component(
 
 @app.delete("/api/inventory/{component_id}")
 def delete_component(component_id: int, db: Session = Depends(get_db), user: User = Depends(require_manager)):
-    component = db.get(Component, component_id)
-    if not component or not component.active:
+    component = repositories.get_active_component(db, component_id)
+    if not component:
         raise HTTPException(status_code=404, detail="Component not found")
-    component.active = False
-    db.add(AuditLog(user_id=user.id, action="DELETE_COMPONENT", component_id=component.id, component_name=component.name, details=f"Deleted SKU {component.sku}"))
-    db.commit()
+    repositories.deactivate_component(
+        db,
+        component,
+        AuditLog(
+            user_id=user.id,
+            action="DELETE_COMPONENT",
+            component_id=component.id,
+            component_name=component.name,
+            details=f"Deleted SKU {component.sku}",
+        ),
+    )
     return {"status": "deleted", "component_id": component.id}
 
 @app.get("/api/reports/availability", response_model=list[AvailabilityResponse])
 def availability(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    components = list(db.scalars(select(Component).where(Component.active.is_(True))))
+    components = repositories.list_active_components(db)
     return [
         {
             **component_response_data(component, user),
@@ -240,7 +184,7 @@ def availability(db: Session = Depends(get_db), user: User = Depends(get_current
 
 @app.get("/api/dashboard", response_model=DashboardResponse)
 def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    components = list(db.scalars(select(Component).where(Component.active.is_(True))))
+    components = repositories.list_active_components(db)
     total_value = sum(c.quantity * c.unit_price for c in components)
     low_count = sum(stock_status(c) == "low-stock" for c in components)
     recent = sorted(components, key=lambda c: c.created_at, reverse=True)[:5]
@@ -256,5 +200,5 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
 
 @app.get("/api/audit-logs")
 def audit_logs(db: Session = Depends(get_db), user: User = Depends(require_manager)):
-    rows = list(db.scalars(select(AuditLog).order_by(AuditLog.timestamp.desc())))
+    rows = repositories.list_audit_logs(db)
     return [{"id": r.id, "user_id": r.user_id, "action": r.action, "component_id": r.component_id, "component_name": r.component_name, "details": r.details, "timestamp": r.timestamp} for r in rows]
