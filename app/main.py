@@ -3,6 +3,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from .bootstrap import initialize_database
@@ -11,9 +12,12 @@ from .models import AuditLog, Component, User
 from .schemas import ComponentCreate, ComponentResponse, ComponentUpdate, DashboardResponse, AvailabilityResponse, LoginRequest, LoginResponse
 from .security import create_access_token, get_current_user, require_manager, verify_password
 from .services import stock_status, validate_search
+from .config import ENFORCE_HTTPS
 from . import repositories
 
 app = FastAPI(title="EIMS API", version="1.0.0")
+if ENFORCE_HTTPS:
+    app.add_middleware(HTTPSRedirectMiddleware)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 app.mount("/static", StaticFiles(directory=FRONTEND), name="static")
@@ -54,12 +58,19 @@ def list_inventory(
     supplier: str | None = None,
     status: str | None = None,
     sort: str = Query(default="id"),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     search = validate_search(search)
     category = validate_search(category)
     supplier = validate_search(supplier)
+    if status not in {None, "in-stock", "low-stock", "out-of-stock"}:
+        raise HTTPException(
+            status_code=422,
+            detail="Unsupported inventory status",
+        )
 
     try:
         components = repositories.list_components(
@@ -67,20 +78,17 @@ def list_inventory(
             search=search,
             category=category,
             supplier=supplier,
+            status=status,
             sort=sort,
             allow_date_sort=user.role == "ADMIN",
+            limit=limit,
+            offset=offset,
         )
     except ValueError as exc:
         raise HTTPException(
             status_code=422,
             detail="Unsupported inventory sort field",
         ) from exc
-
-    if status:
-        components = [
-            component for component in components
-            if stock_status(component) == status
-        ]
 
     return [component_response_data(component, user) for component in components]
 
@@ -187,14 +195,48 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
     components = repositories.list_active_components(db)
     total_value = sum(c.quantity * c.unit_price for c in components)
     low_count = sum(stock_status(c) == "low-stock" for c in components)
+    low_stock_components = [
+        component for component in components
+        if stock_status(component) == "low-stock"
+    ]
     recent = sorted(components, key=lambda c: c.created_at, reverse=True)[:5]
+    category_totals: dict[str, dict[str, int]] = {}
+    trend_totals: dict[str, dict[str, int]] = {}
+    for component in components:
+        category = category_totals.setdefault(
+            component.category,
+            {"quantity": 0, "component_count": 0},
+        )
+        category["quantity"] += component.quantity
+        category["component_count"] += 1
+
+        date = component.created_at.date().isoformat()
+        trend = trend_totals.setdefault(
+            date,
+            {"quantity": 0, "component_count": 0},
+        )
+        trend["quantity"] += component.quantity
+        trend["component_count"] += 1
+
     return DashboardResponse(
         total_components=len(components),
         total_stock_value=round(total_value, 2),
         low_stock_count=low_count,
+        low_stock_components=[
+            component_response_data(component, user)
+            for component in low_stock_components
+        ],
         recently_added=[
             component_response_data(component, user)
             for component in recent
+        ],
+        category_stock=[
+            {"category": category, **values}
+            for category, values in sorted(category_totals.items())
+        ],
+        stock_trend=[
+            {"date": date, **trend_totals[date]}
+            for date in sorted(trend_totals)
         ],
     )
 

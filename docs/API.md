@@ -10,7 +10,9 @@ Send the login token in the `Authorization` header:
 Authorization: Bearer <access_token>
 ```
 
-`ADMIN` and `MANAGER` can add, update, and delete inventory components. `STAFF` can read inventory and reports but cannot perform those changes. Only `ADMIN` can sort by or see component creation dates. Unauthenticated requests to protected endpoints return `401`; authenticated users without permission receive `403`.
+`ADMIN` and `MANAGER` can add, update, and delete inventory components. `STAFF` can read inventory and reports but cannot perform those changes. Only `ADMIN` can sort by or see component creation dates. Unauthenticated requests to protected endpoints return `401` with a
+`WWW-Authenticate: Bearer` challenge. Invalid or expired tokens also return
+`401`; authenticated users without permission receive `403`.
 
 ## Endpoints
 
@@ -20,7 +22,7 @@ Base path: `/api`
 |---|---|---|---|
 | POST | `/auth/login` | Public | Authenticate and return an access token and role |
 | GET | `/me` | Authenticated | Return the current user's ID, username, and role |
-| GET | `/inventory` | Authenticated | List active components with optional search, filters, and sorting |
+| GET | `/inventory` | Authenticated | List a page of active components with optional search, filters, and sorting |
 | POST | `/inventory` | Admin/Manager | Create a component and assign its unique SKU |
 | GET | `/inventory/{component_id}` | Authenticated | Read one active component |
 | PATCH | `/inventory/{component_id}` | Admin/Manager | Update quantity, unit price, supplier, or reorder level |
@@ -41,10 +43,22 @@ Base path: `/api`
 | `status` | `in-stock`, `low-stock`, or `out-of-stock` |
 | `sort` | `id` (default), `name`, `quantity`, or `unit_price`; prefix with `-` for descending |
 | `sort` (ADMIN only) | `date_added` or `date`; prefix with `-` for descending |
+| `limit` | Number of records to return, from 1 to 500; defaults to 100 |
+| `offset` | Number of matching records to skip; defaults to 0 |
 
-For example, `GET /api/inventory?category=Microcontroller&status=low-stock&sort=-quantity` returns low-stock microcontrollers ordered by quantity descending.
+For example, `GET /api/inventory?category=Microcontroller&status=low-stock&sort=-quantity&limit=50&offset=100` returns the third page of low-stock microcontrollers ordered by quantity descending. Pagination and status filtering are applied in the database, so large inventories do not need to be loaded into application memory for each request.
 
 Staff requests to sort by creation date are rejected with `422`.
+
+The frontend highlights low-stock rows with an amber indicator and
+`Needs reorder` label. Out-of-stock rows use a separate red indicator. The
+highlight is recalculated whenever inventory is refreshed, including after a
+quantity or reorder-level update.
+
+The dashboard displays total component count, total stock value, low-stock
+count, and a clickable list of the five most recently added active components.
+It also returns category stock levels and stock-added trend points for the
+dashboard charts.
 
 ## Component payloads
 

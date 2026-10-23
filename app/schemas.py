@@ -81,8 +81,21 @@ class ComponentResponse(BaseModel):
 class AvailabilityResponse(ComponentResponse):
     status: str
 
+class CategoryStockSummary(BaseModel):
+    category: str
+    quantity: int
+    component_count: int
+
+class StockTrendPoint(BaseModel):
+    date: str
+    quantity: int
+    component_count: int
+
 class DashboardResponse(BaseModel):
     total_components: int
     total_stock_value: float
     low_stock_count: int
+    low_stock_components: list[ComponentResponse]
     recently_added: list[ComponentResponse]
+    category_stock: list[CategoryStockSummary]
+    stock_trend: list[StockTrendPoint]

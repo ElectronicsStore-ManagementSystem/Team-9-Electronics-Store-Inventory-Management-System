@@ -12,6 +12,47 @@ def test_unauthenticated_inventory_is_rejected(client):
     assert r.status_code == 401
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/me",
+        "/api/inventory",
+        "/api/inventory/1",
+        "/api/reports/availability",
+        "/api/dashboard",
+        "/api/audit-logs",
+    ],
+)
+def test_all_protected_read_routes_require_authentication(client, path):
+    response = client.get(path)
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Authentication required"
+    assert response.headers["www-authenticate"] == "Bearer"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/me",
+        "/api/inventory",
+        "/api/inventory/1",
+        "/api/reports/availability",
+        "/api/dashboard",
+        "/api/audit-logs",
+    ],
+)
+def test_all_protected_read_routes_reject_invalid_tokens(client, path):
+    response = client.get(
+        path,
+        headers={"Authorization": "Bearer not-a-valid-token"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid or expired token"
+    assert response.headers["www-authenticate"] == "Bearer"
+
+
 def test_seeded_user_passwords_are_salted_hashes_and_plaintext_is_rejected(
     client,
 ):
@@ -166,6 +207,16 @@ def test_staff_cannot_add_or_delete(client, staff_token):
         "/api/inventory/1",
         headers=h,
     ).status_code == 403
+
+
+def test_staff_cannot_update_components(client, staff_token):
+    response = client.patch(
+        "/api/inventory/1",
+        json={"quantity": 1},
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 403
 
 
 def test_manager_can_add_component_and_find_it_afterward(client):
@@ -504,7 +555,46 @@ def test_availability_and_dashboard(client, staff_token):
 
     dash = client.get("/api/dashboard", headers=h).json()
     assert dash["total_components"] == 3
+    assert dash["total_stock_value"] == 13780.0
     assert dash["low_stock_count"] == 1
+    assert [item["name"] for item in dash["low_stock_components"]] == [
+        "ESP32 Dev Board"
+    ]
+    assert len(dash["recently_added"]) == 3
+    assert {item["name"] for item in dash["recently_added"]} == {
+        "Arduino Uno",
+        "ESP32 Dev Board",
+        "220 Ohm Resistor",
+    }
+    assert dash["category_stock"] == [
+        {"category": "Microcontroller", "quantity": 22, "component_count": 2},
+        {"category": "Passive", "quantity": 0, "component_count": 1},
+    ]
+    assert sum(point["quantity"] for point in dash["stock_trend"]) == 22
+
+
+def test_dashboard_low_stock_alert_data_updates_after_quantity_change(
+    client, admin_token, staff_token
+):
+    admin_headers = auth(admin_token)
+    staff_headers = auth(staff_token)
+
+    before = client.get("/api/dashboard", headers=staff_headers).json()
+    assert before["low_stock_count"] == 1
+
+    updated = client.patch(
+        "/api/inventory/1",
+        json={"quantity": 4},
+        headers=admin_headers,
+    )
+    assert updated.status_code == 200
+
+    after = client.get("/api/dashboard", headers=staff_headers).json()
+    assert after["low_stock_count"] == 2
+    assert {item["name"] for item in after["low_stock_components"]} == {
+        "Arduino Uno",
+        "ESP32 Dev Board",
+    }
 
 
 def test_deleted_sku_is_not_reused(client, admin_token):

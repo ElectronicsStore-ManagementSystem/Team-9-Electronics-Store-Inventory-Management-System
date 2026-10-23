@@ -60,6 +60,16 @@ function setLoggedIn() {
     'hidden',
     !['ADMIN', 'MANAGER'].includes(role)
   );
+  const isStaff = role === 'STAFF';
+  $('dashboard-role').textContent = isStaff
+    ? 'Staff · Read-only view'
+    : `${role === 'ADMIN' ? 'Admin' : 'Manager'} · Full view`;
+  $('dashboard-description').textContent = isStaff
+    ? 'Review inventory, stock levels, and suppliers. Changes require a manager.'
+    : 'Track and manage components, stock levels, and suppliers.';
+  $('quick-start-add-step').innerHTML = ['ADMIN', 'MANAGER'].includes(role)
+    ? '<strong>Add it:</strong> choose <strong>Add component</strong> and complete the form.'
+    : '<strong>Add it:</strong> ask a manager to add new stock; you can search and review components here.';
 
   if (token) {
     refresh();
@@ -105,6 +115,11 @@ $('logout').onclick = () => {
   $('login-error').textContent = '';
   $('inventory').innerHTML = '';
   $('stats').innerHTML = '';
+  $('recent-components-list').innerHTML = '';
+  $('category-chart').innerHTML = '';
+  $('trend-chart').innerHTML = '';
+  $('low-stock-alert').classList.add('hidden');
+  $('low-stock-alert-items').innerHTML = '';
   $('form-card').classList.add('hidden');
   $('add-feedback').classList.add('hidden');
   $('add-feedback').textContent = '';
@@ -115,7 +130,18 @@ $('logout').onclick = () => {
 // ==================== INVENTORY CONTROLS ====================
 
 $('refresh').onclick = refresh;
-$('search').oninput = refresh;
+let searchTimer;
+$('search').oninput = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(refresh, 300);
+};
+$('search').onkeydown = event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    clearTimeout(searchTimer);
+    refresh();
+  }
+};
 $('category').onchange = refresh;
 $('supplier').onchange = refresh;
 $('status').onchange = refresh;
@@ -127,6 +153,24 @@ $('inventory').addEventListener('click', event => {
     showComponentDetails(componentButton.dataset.componentId);
   }
 });
+$('recent-components-list').addEventListener('click', event => {
+  const componentButton = event.target.closest('[data-component-id]');
+  if (componentButton) {
+    showComponentDetails(componentButton.dataset.componentId);
+  }
+});
+$('low-stock-alert-items').addEventListener('click', event => {
+  const componentButton = event.target.closest('[data-component-id]');
+  if (componentButton) {
+    showComponentDetails(componentButton.dataset.componentId);
+  }
+});
+$('view-low-stock').onclick = () => {
+  $('search').value = '';
+  $('status').value = 'low-stock';
+  refresh();
+  $('inventory').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
 $('component-details').addEventListener('click', event => {
   if (event.target.closest('[data-edit-component]') && currentComponent) {
     renderComponentEditForm(currentComponent);
@@ -293,6 +337,7 @@ $('add-btn').onclick = () => {
   $('add-feedback').textContent = '';
   $('form-card').classList.remove('hidden');
   $('form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('component-form').elements.namedItem('name').focus();
 };
 
 $('cancel-add').onclick = () => {
@@ -527,6 +572,38 @@ async function refresh() {
       </div>
     `;
 
+    const recentComponents = dashboard.recently_added || [];
+    $('recent-components-list').innerHTML = recentComponents.length
+      ? recentComponents.map(component => `
+          <button
+            class="recent-component"
+            type="button"
+            data-component-id="${component.id}"
+            aria-label="View recently added ${escapeHTML(component.name)}"
+          >
+            <span class="recent-component-name">${escapeHTML(component.name)}</span>
+            <span class="recent-component-meta">
+              ${escapeHTML(component.category)} · ${escapeHTML(component.sku)}
+            </span>
+          </button>
+        `).join('')
+      : '<p class="empty-state">No components have been added yet.</p>';
+    renderLowStockAlert(dashboard);
+    renderBarChart(
+      $('category-chart'),
+      dashboard.category_stock || [],
+      item => item.category,
+      item => item.quantity,
+      'category'
+    );
+    renderBarChart(
+      $('trend-chart'),
+      dashboard.stock_trend || [],
+      item => item.date,
+      item => item.quantity,
+      'date'
+    );
+
     $('results-count').textContent =
       `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
 
@@ -541,6 +618,61 @@ async function refresh() {
         </tr>
       `;
       return;
+    }
+
+    function renderLowStockAlert(dashboard) {
+      const count = dashboard.low_stock_count || 0;
+      const components = dashboard.low_stock_components || [];
+      const alert = $('low-stock-alert');
+
+      if (!count) {
+        alert.classList.add('hidden');
+        return;
+      }
+
+      $('low-stock-alert-message').textContent =
+        `${count} ${count === 1 ? 'component is' : 'components are'} at or below the reorder level.`;
+      $('low-stock-alert-items').innerHTML = components.map(component => `
+        <button
+          class="low-stock-alert-item"
+          type="button"
+          data-component-id="${component.id}"
+          aria-label="View low-stock ${escapeHTML(component.name)}"
+        >
+          ${escapeHTML(component.name)}
+          <span>${component.quantity} / ${component.reorder_level} units</span>
+        </button>
+      `).join('');
+      alert.classList.remove('hidden');
+    }
+
+    function renderBarChart(container, points, label, value, kind) {
+      if (!points.length) {
+        container.innerHTML = '<p class="empty-state">Not enough data to chart yet.</p>';
+        return;
+      }
+
+      const maximum = Math.max(...points.map(value), 1);
+      container.innerHTML = points.map(point => {
+        const amount = value(point);
+        const width = Math.max((amount / maximum) * 100, amount ? 4 : 0);
+        const displayLabel = kind === 'date'
+          ? new Intl.DateTimeFormat(undefined, {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            }).format(new Date(`${label(point)}T00:00:00`))
+          : label(point);
+        return `
+          <div class="chart-row">
+            <span class="chart-label" title="${escapeHTML(displayLabel)}">${escapeHTML(displayLabel)}</span>
+            <span class="chart-track">
+              <span class="chart-bar" style="width: ${width}%"></span>
+            </span>
+            <strong class="chart-value">${amount}</strong>
+          </div>
+        `;
+      }).join('');
     }
 
     // Display matching components
@@ -559,11 +691,11 @@ async function refresh() {
       }[stockStatus];
 
       const action = ['ADMIN', 'MANAGER'].includes(role)
-        ? `<button onclick="removeItem(${component.id})">Delete</button>`
-        : 'Read only';
+        ? `<button class="management-control" onclick="removeItem(${component.id})">Delete</button>`
+        : '<span class="read-only-label">Read only</span>';
 
       return `
-        <tr>
+        <tr class="stock-row-${stockStatus}">
           <td>${escapeHTML(component.sku)}</td>
           <td>
             <button
@@ -574,7 +706,12 @@ async function refresh() {
             >${escapeHTML(component.name)}</button>
           </td>
           <td>${escapeHTML(component.category)}</td>
-          <td>${component.quantity}</td>
+          <td class="quantity-cell">
+            <span>${component.quantity}</span>
+            ${stockStatus === 'low-stock'
+              ? '<span class="stock-alert">Needs reorder</span>'
+              : ''}
+          </td>
           <td>₹${Number(component.unit_price).toFixed(2)}</td>
           <td>${escapeHTML(component.supplier)}</td>
           <td>${component.reorder_level}</td>

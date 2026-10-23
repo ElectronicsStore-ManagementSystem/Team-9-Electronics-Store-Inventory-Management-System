@@ -72,9 +72,12 @@
           <div>
             <p class="eyebrow">INVENTORY MANAGEMENT</p>
             <h1>Inventory</h1>
-            <p>Track your components, stock levels, and suppliers.</p>
+            <p id="dashboard-description">Track your components, stock levels, and suppliers.</p>
           </div>
-          <span class="live-indicator"><span></span> Live inventory</span>
+          <div class="dashboard-view">
+            <span class="live-indicator"><span></span> Live inventory</span>
+            <span id="dashboard-role" class="dashboard-role" aria-live="polite"></span>
+          </div>
         </div>
 
         <div class="inventory-controls">
@@ -86,7 +89,9 @@
                 type="search"
                 placeholder="Search by name, SKU, or category"
                 aria-label="Search inventory"
+                aria-describedby="search-help"
               >
+              <span id="search-help" class="sr-only">Results update as you type. Press Enter to search now.</span>
             </label>
 
             <div class="search-actions">
@@ -94,7 +99,7 @@
                 <span class="refresh-icon" aria-hidden="true">↻</span>
                 Refresh
               </button>
-              <button id="add-btn" class="hidden" type="button">
+              <button id="add-btn" class="hidden management-control" type="button">
                 <span aria-hidden="true">+</span> Add component
               </button>
             </div>
@@ -164,8 +169,64 @@
         </div>
       </section>
 
+      <aside class="quick-start" aria-labelledby="quick-start-title">
+        <div>
+          <p class="eyebrow">QUICK START</p>
+          <h2 id="quick-start-title">New to the inventory workspace?</h2>
+          <p>Search, review, or add a component in three simple steps.</p>
+        </div>
+        <ol>
+          <li><strong>Find it:</strong> type a name, SKU, or category above.</li>
+          <li><strong>Review it:</strong> select a component name to see details.</li>
+          <li id="quick-start-add-step"><strong>Add it:</strong> choose <strong>Add component</strong> and complete the form.</li>
+        </ol>
+      </aside>
+
+      <section id="low-stock-alert" class="low-stock-alert hidden" aria-labelledby="low-stock-alert-title" role="alert">
+        <div class="alert-icon" aria-hidden="true">!</div>
+        <div class="alert-copy">
+          <h2 id="low-stock-alert-title">Low-stock alert</h2>
+          <p id="low-stock-alert-message"></p>
+          <div id="low-stock-alert-items" class="low-stock-alert-items"></div>
+        </div>
+        <button id="view-low-stock" class="secondary-button" type="button">View low-stock items</button>
+      </section>
+
       <!-- Dashboard statistics -->
       <section id="stats" class="stats" aria-label="Inventory statistics">
+      </section>
+
+      <section class="recent-components" aria-labelledby="recent-components-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">ACTIVITY</p>
+            <h2 id="recent-components-title">Recently added</h2>
+          </div>
+          <span class="section-hint">Latest inventory additions</span>
+        </div>
+        <div id="recent-components-list" class="recent-components-list" aria-live="polite"></div>
+      </section>
+
+      <section class="dashboard-charts" aria-labelledby="dashboard-charts-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">INSIGHTS</p>
+            <h2 id="dashboard-charts-title">Inventory charts</h2>
+          </div>
+          <span class="section-hint">Updated with the dashboard</span>
+        </div>
+        <div class="chart-grid">
+          <article class="chart-card">
+            <h3>Stock by category</h3>
+            <p class="chart-description">Units currently in stock for each category.</p>
+            <div id="category-chart" class="bar-chart" role="img" aria-label="Stock levels by category"></div>
+          </article>
+          <article class="chart-card">
+            <h3>Stock added over time</h3>
+            <p class="chart-description">Units introduced on each inventory date.</p>
+            <div id="trend-chart" class="bar-chart" role="img" aria-label="Stock added over time"></div>
+          </article>
+        </div>
       </section>
 
       <p id="add-feedback" class="form-feedback hidden" role="status" aria-live="polite"></p>
@@ -241,10 +302,10 @@
               placeholder="Enter component name"
               required
               maxlength="120"
-              aria-describedby="name-error"
-  >
-  <span id="name-error" class="field-error" aria-live="polite"></span>
-            
+              aria-describedby="name-help name-error"
+            >
+            <small id="name-help" class="field-help">Use the name printed on the component or packaging.</small>
+            <span id="name-error" class="field-error" aria-live="polite"></span>
           </label>
 
           <label>
@@ -254,11 +315,12 @@
               type="text"
               placeholder="Enter category"
               required
-            minlength="1"
-    maxlength="120"
-    aria-describedby="category-error"
+              minlength="1"
+              maxlength="120"
+              aria-describedby="category-help category-error"
             >
-         <span id="category-error" class="field-error" aria-live="polite"></span>   
+            <small id="category-help" class="field-help">For example: Microcontroller, Sensor, or Display.</small>
+            <span id="category-error" class="field-error" aria-live="polite"></span>
           </label>
 
           <label>
@@ -269,12 +331,10 @@
               min="0"
               placeholder="Enter quantity"
               required
-              minlength="1"
-    maxlength="120"
-    aria-describedby="quantity-error"
-  >
-  <span id="quantity-error" class="field-error" aria-live="polite"></span>
-            
+              aria-describedby="quantity-help quantity-error"
+            >
+            <small id="quantity-help" class="field-help">Enter the number of units currently available.</small>
+            <span id="quantity-error" class="field-error" aria-live="polite"></span>
           </label>
 
           <label>
@@ -286,11 +346,10 @@
               step="0.01"
               placeholder="Enter unit price"
               required
-              minlength="1"
-    maxlength="120"
-    aria-describedby="unit_price-error"
+              aria-describedby="price-help unit_price-error"
             >
-          <span id="unit_price-error" class="field-error" aria-live="polite"></span>
+            <small id="price-help" class="field-help">Enter the price for one unit.</small>
+            <span id="unit_price-error" class="field-error" aria-live="polite"></span>
           </label>
 
           <label>
@@ -300,12 +359,12 @@
               type="text"
               placeholder="Enter supplier name"
               required
-            minlength="1"
-    maxlength="120"
-    aria-describedby="supplier-error" 
+              minlength="1"
+              maxlength="120"
+              aria-describedby="supplier-help supplier-error"
             >
-    <span id="supplier-error" class="field-error" aria-live="polite"></span>
- 
+            <small id="supplier-help" class="field-help">Use the supplier's business name.</small>
+            <span id="supplier-error" class="field-error" aria-live="polite"></span>
           </label>
 
           <label>
@@ -315,12 +374,10 @@
               type="number"
               min="0"
               value="5"
+              aria-describedby="reorder-help reorder_level-error"
             >
-            <span
-  id="reorder_level-error"
-  class="field-error"
-  aria-live="polite"
-></span>
+            <small id="reorder-help" class="field-help">We will flag stock at or below this number. Default: 5.</small>
+            <span id="reorder_level-error" class="field-error" aria-live="polite"></span>
           </label>
 
           <div class="form-actions">
@@ -329,7 +386,7 @@
 
         </form>
 
-        <p id="form-error" class="error" role="alert"></p>
+        <p id="form-error" class="error" role="alert" aria-live="assertive"></p>
       </section>
 
     </section>
