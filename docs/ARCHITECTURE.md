@@ -43,7 +43,7 @@ For example, a component update is validated by the request schema, authorized b
 - `app/models.py` defines the SQLAlchemy tables; `app/schemas.py` defines validated API payloads and responses.
 - `app/bootstrap.py` creates mapped tables and seeds development demo records.
 - `app/services.py` holds small inventory business rules that do not perform database access.
-- `app/security.py` owns password hashing/token handling and reusable role dependencies.
+- `app/security.py` owns password hashing/token handling and reusable role dependencies. Passwords are stored as PBKDF2-HMAC-SHA256 digests with per-password random salts; login verifies hashes only and does not fall back to plaintext comparison.
 - `backend/` contains earlier standalone domain/service prototypes, some retained for isolated unit tests. It is not imported by the running FastAPI application; application endpoints use `app/`.
 - `tests/` contains API integration tests and isolated unit tests.
 - `docs/API.md` documents HTTP endpoints, roles, parameters, payloads, and error behavior.

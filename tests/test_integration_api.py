@@ -12,6 +12,49 @@ def test_unauthenticated_inventory_is_rejected(client):
     assert r.status_code == 401
 
 
+def test_seeded_user_passwords_are_salted_hashes_and_plaintext_is_rejected(
+    client,
+):
+    from app.db import SessionLocal
+    from app.models import User
+    from app.security import verify_password
+
+    db = SessionLocal()
+    try:
+        admin = db.query(User).filter_by(username="admin").one()
+        staff = db.query(User).filter_by(username="staff").one()
+        admin_hash = admin.password_hash
+        staff_hash = staff.password_hash
+        assert admin_hash != "Admin@12345"
+        assert staff_hash != "Staff@12345"
+        assert admin_hash.split("$")[2] != staff_hash.split("$")[2]
+        assert verify_password("Admin@12345", admin_hash)
+        assert verify_password("Staff@12345", staff_hash)
+    finally:
+        db.close()
+
+    admin_login = client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "Admin@12345"},
+    )
+    assert admin_login.status_code == 200
+    assert "password_hash" not in admin_login.json()
+
+    db = SessionLocal()
+    try:
+        admin = db.query(User).filter_by(username="admin").one()
+        admin.password_hash = "Admin@12345"
+        db.commit()
+    finally:
+        db.close()
+
+    plaintext_login = client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "Admin@12345"},
+    )
+    assert plaintext_login.status_code == 401
+
+
 def test_staff_can_read_inventory(client, staff_token):
     r = client.get(
         "/api/inventory",
