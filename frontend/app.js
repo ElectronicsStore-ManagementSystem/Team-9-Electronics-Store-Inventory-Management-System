@@ -98,6 +98,8 @@ $('logout').onclick = () => {
   $('inventory').innerHTML = '';
   $('stats').innerHTML = '';
   $('recent-components-list').innerHTML = '';
+  $('category-chart').innerHTML = '';
+  $('trend-chart').innerHTML = '';
   $('form-card').classList.add('hidden');
   $('add-feedback').classList.add('hidden');
   $('add-feedback').textContent = '';
@@ -386,6 +388,20 @@ async function refresh() {
           </button>
         `).join('')
       : '<p class="empty-state">No components have been added yet.</p>';
+    renderBarChart(
+      $('category-chart'),
+      dashboard.category_stock || [],
+      item => item.category,
+      item => item.quantity,
+      'category'
+    );
+    renderBarChart(
+      $('trend-chart'),
+      dashboard.stock_trend || [],
+      item => item.date,
+      item => item.quantity,
+      'date'
+    );
 
     $('results-count').textContent =
       `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
@@ -401,6 +417,35 @@ async function refresh() {
         </tr>
       `;
       return;
+    }
+
+    function renderBarChart(container, points, label, value, kind) {
+      if (!points.length) {
+        container.innerHTML = '<p class="empty-state">Not enough data to chart yet.</p>';
+        return;
+      }
+
+      const maximum = Math.max(...points.map(value), 1);
+      container.innerHTML = points.map(point => {
+        const amount = value(point);
+        const width = Math.max((amount / maximum) * 100, amount ? 4 : 0);
+        const displayLabel = kind === 'date'
+          ? new Intl.DateTimeFormat(undefined, {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            }).format(new Date(`${label(point)}T00:00:00`))
+          : label(point);
+        return `
+          <div class="chart-row">
+            <span class="chart-label" title="${escapeHTML(displayLabel)}">${escapeHTML(displayLabel)}</span>
+            <span class="chart-track">
+              <span class="chart-bar" style="width: ${width}%"></span>
+            </span>
+            <strong class="chart-value">${amount}</strong>
+          </div>
+        `;
+      }).join('');
     }
 
     // Display matching components

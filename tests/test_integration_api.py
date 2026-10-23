@@ -553,6 +553,11 @@ def test_availability_and_dashboard(client, staff_token):
         "ESP32 Dev Board",
         "220 Ohm Resistor",
     }
+    assert dash["category_stock"] == [
+        {"category": "Microcontroller", "quantity": 22, "component_count": 2},
+        {"category": "Passive", "quantity": 0, "component_count": 1},
+    ]
+    assert sum(point["quantity"] for point in dash["stock_trend"]) == 22
 
 
 def test_deleted_sku_is_not_reused(client, admin_token):

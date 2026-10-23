@@ -194,6 +194,28 @@
         <div id="recent-components-list" class="recent-components-list" aria-live="polite"></div>
       </section>
 
+      <section class="dashboard-charts" aria-labelledby="dashboard-charts-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">INSIGHTS</p>
+            <h2 id="dashboard-charts-title">Inventory charts</h2>
+          </div>
+          <span class="section-hint">Updated with the dashboard</span>
+        </div>
+        <div class="chart-grid">
+          <article class="chart-card">
+            <h3>Stock by category</h3>
+            <p class="chart-description">Units currently in stock for each category.</p>
+            <div id="category-chart" class="bar-chart" role="img" aria-label="Stock levels by category"></div>
+          </article>
+          <article class="chart-card">
+            <h3>Stock added over time</h3>
+            <p class="chart-description">Units introduced on each inventory date.</p>
+            <div id="trend-chart" class="bar-chart" role="img" aria-label="Stock added over time"></div>
+          </article>
+        </div>
+      </section>
+
       <p id="add-feedback" class="form-feedback hidden" role="status" aria-live="polite"></p>
 
       <!-- Inventory table -->

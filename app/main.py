@@ -196,6 +196,24 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
     total_value = sum(c.quantity * c.unit_price for c in components)
     low_count = sum(stock_status(c) == "low-stock" for c in components)
     recent = sorted(components, key=lambda c: c.created_at, reverse=True)[:5]
+    category_totals: dict[str, dict[str, int]] = {}
+    trend_totals: dict[str, dict[str, int]] = {}
+    for component in components:
+        category = category_totals.setdefault(
+            component.category,
+            {"quantity": 0, "component_count": 0},
+        )
+        category["quantity"] += component.quantity
+        category["component_count"] += 1
+
+        date = component.created_at.date().isoformat()
+        trend = trend_totals.setdefault(
+            date,
+            {"quantity": 0, "component_count": 0},
+        )
+        trend["quantity"] += component.quantity
+        trend["component_count"] += 1
+
     return DashboardResponse(
         total_components=len(components),
         total_stock_value=round(total_value, 2),
@@ -203,6 +221,14 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
         recently_added=[
             component_response_data(component, user)
             for component in recent
+        ],
+        category_stock=[
+            {"category": category, **values}
+            for category, values in sorted(category_totals.items())
+        ],
+        stock_trend=[
+            {"date": date, **trend_totals[date]}
+            for date in sorted(trend_totals)
         ],
     )
 

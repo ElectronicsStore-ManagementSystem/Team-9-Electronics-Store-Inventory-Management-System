@@ -560,6 +560,84 @@ summary:focus-visible {
   font-size: 13px;
 }
 
+.dashboard-charts {
+  margin-bottom: 22px;
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.chart-card {
+  min-width: 0;
+  padding: 16px;
+  background: #fbfcff;
+  border: 1px solid #e8ecf4;
+  border-radius: 11px;
+}
+
+.chart-card h3 {
+  margin: 0;
+  color: #263958;
+  font-size: 14px;
+}
+
+.chart-description {
+  margin: 4px 0 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.bar-chart {
+  display: grid;
+  gap: 11px;
+}
+
+.chart-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.7fr) minmax(80px, 1.4fr) 36px;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  font-size: 11px;
+}
+
+.chart-label {
+  overflow: hidden;
+  color: #59677c;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chart-track {
+  display: block;
+  height: 12px;
+  overflow: hidden;
+  background: #e9edf5;
+  border-radius: 999px;
+}
+
+.chart-bar {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  background: linear-gradient(90deg, #3157d5, #6d8df0);
+  border-radius: inherit;
+  transition: width 0.25s ease;
+}
+
+.chart-value {
+  color: #263958;
+  text-align: right;
+}
+
 .stat {
   position: relative;
   display: flex;
@@ -1089,6 +1167,10 @@ button.hidden {
   .stats {
     grid-template-columns: 1fr;
     gap: 10px;
+  }
+
+  .chart-grid {
+    grid-template-columns: 1fr;
   }
 
   .stat {

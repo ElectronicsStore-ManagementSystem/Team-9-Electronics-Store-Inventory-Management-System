@@ -57,6 +57,8 @@ quantity or reorder-level update.
 
 The dashboard displays total component count, total stock value, low-stock
 count, and a clickable list of the five most recently added active components.
+It also returns category stock levels and stock-added trend points for the
+dashboard charts.
 
 ## Component payloads
 
