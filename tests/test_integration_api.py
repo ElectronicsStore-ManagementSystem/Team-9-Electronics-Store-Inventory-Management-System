@@ -325,3 +325,59 @@ def test_search_inventory_with_no_matches(client, staff_token):
     assert response.status_code == 200
     assert response.json() == []
 
+def test_filter_inventory_by_category(client, staff_token):
+    response = client.get(
+        "/api/inventory?category=Microcontroller",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+    items = response.json()
+    assert len(items) == 2
+    assert all(item["category"] == "Microcontroller" for item in items)
+
+
+def test_filter_inventory_by_supplier(client, staff_token):
+    response = client.get(
+        "/api/inventory?supplier=CircuitHub",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+    items = response.json()
+    assert len(items) == 1
+    assert all(item["supplier"] == "CircuitHub" for item in items)
+
+
+def test_filter_inventory_by_stock_status(client, staff_token):
+    response = client.get(
+        "/api/inventory?status=low-stock",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+    items = response.json()
+    assert len(items) == 1
+    assert items[0]["name"] == "ESP32 Dev Board"
+
+
+def test_filter_inventory_with_combined_criteria(client, staff_token):
+    response = client.get(
+        "/api/inventory?category=Passive&supplier=CircuitHub&status=out-of-stock",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+    items = response.json()
+    assert len(items) == 1
+    assert items[0]["name"] == "220 Ohm Resistor"
+
+
+def test_filter_inventory_with_no_matches(client, staff_token):
+    response = client.get(
+        "/api/inventory?category=Microcontroller&supplier=CircuitHub",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []

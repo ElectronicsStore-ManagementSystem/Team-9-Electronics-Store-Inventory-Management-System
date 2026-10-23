@@ -1,20 +1,227 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>EIMS</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>Electronics Store Inventory Management</title>
+
   <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body>
   <main class="container">
-    <header><div><h1>Electronics Store Inventory Management System</h1></div><button id="logout" class="hidden">Logout</button></header>
-    <section id="login-card" class="card"><h2>Sign in</h2><form id="login-form"><input id="username" placeholder="Username" required><input id="password" type="password" placeholder="Password" required><button>Login</button></form><small>Demo: admin / Admin@12345 or staff / Staff@12345</small><p id="login-error" class="error"></p></section>
-    <section id="app" class="hidden">
-      <div class="toolbar"><input id="search" placeholder="Search name, SKU or category"><select id="status"><option value="">All stock</option><option value="in-stock">In stock</option><option value="low-stock">Low stock</option><option value="out-of-stock">Out of stock</option></select><button id="refresh">Refresh</button><button id="add-btn" class="hidden">Add component</button></div>
-      <div id="stats" class="stats"></div>
-      <div class="card"><table><thead><tr><th>SKU</th><th>Name</th><th>Category</th><th>Qty</th><th>Price</th><th>Supplier</th><th>Reorder</th><th>Status</th><th>Action</th></tr></thead><tbody id="inventory"></tbody></table></div>
-      <section id="form-card" class="card hidden"><h2>Add component</h2><form id="component-form" class="grid"><input name="name" placeholder="Name" required><input name="category" placeholder="Category" required><input name="quantity" type="number" min="0" placeholder="Quantity" required><input name="unit_price" type="number" min="0" step="0.01" placeholder="Unit price" required><input name="supplier" placeholder="Supplier" required><input name="reorder_level" type="number" min="0" value="5" placeholder="Reorder level" required><button>Add</button><button type="button" id="cancel-add">Cancel</button></form><p id="form-error" class="error"></p></section>
+
+    <!-- Header -->
+    <header>
+      <div>
+        <h1>Electronics Store Inventory Management System</h1>
+        <p>Manage components, suppliers, and stock levels.</p>
+      </div>
+
+      <button id="logout" class="hidden" type="button">
+        Logout
+      </button>
+    </header>
+
+    <!-- Login -->
+    <section id="login-card" class="card">
+      <h2>Sign in</h2>
+      <p>Log in to access the inventory dashboard.</p>
+
+      <form id="login-form">
+        <label for="username">Username</label>
+        <input
+          id="username"
+          name="username"
+          type="text"
+          placeholder="Enter username"
+          autocomplete="username"
+          required
+        >
+
+        <label for="password">Password</label>
+        <input
+          id="password"
+          name="password"
+          type="password"
+          placeholder="Enter password"
+          autocomplete="current-password"
+          required
+        >
+
+        <button type="submit">Login</button>
+      </form>
+
+      <p id="login-error" class="error" role="alert"></p>
     </section>
+
+    <!-- Inventory application -->
+    <section id="app" class="hidden">
+
+      <!-- Inventory heading -->
+      <section class="card">
+        <h2>Inventory</h2>
+        <p>Search and filter components to find the items you need.</p>
+
+        <!-- Search and filters -->
+        <div class="toolbar">
+
+          <input
+            id="search"
+            type="search"
+            placeholder="Search name, SKU or category"
+            aria-label="Search inventory"
+          >
+
+          <select id="category" aria-label="Filter by category">
+            <option value="">All categories</option>
+            <option value="Microcontroller">Microcontroller</option>
+            <option value="Sensor">Sensor</option>
+            <option value="Display">Display</option>
+          </select>
+
+          <select id="supplier" aria-label="Filter by supplier">
+            <option value="">All suppliers</option>
+            <option value="TechSource">TechSource</option>
+          </select>
+
+          <select id="status" aria-label="Filter by stock status">
+            <option value="">All stock statuses</option>
+            <option value="in-stock">In stock</option>
+            <option value="low-stock">Low stock</option>
+            <option value="out-of-stock">Out of stock</option>
+          </select>
+
+          <button id="refresh" type="button">Refresh</button>
+
+          <button id="add-btn" class="hidden" type="button">
+            Add component
+          </button>
+        </div>
+      </section>
+
+      <!-- Dashboard statistics -->
+      <section id="stats" class="stats" aria-label="Inventory statistics">
+      </section>
+
+      <!-- Inventory table -->
+      <section class="card">
+        <h2>Components</h2>
+
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">SKU</th>
+                <th scope="col">Name</th>
+                <th scope="col">Category</th>
+                <th scope="col">Quantity</th>
+                <th scope="col">Unit price</th>
+                <th scope="col">Supplier</th>
+                <th scope="col">Reorder level</th>
+                <th scope="col">Stock status</th>
+                <th scope="col">Action</th>
+              </tr>
+            </thead>
+
+            <tbody id="inventory">
+              <tr>
+                <td colspan="9">Loading inventory...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Add component form -->
+      <section id="form-card" class="card hidden">
+        <h2>Add component</h2>
+        <p>Enter the component details below.</p>
+
+        <form id="component-form" class="grid">
+
+          <label>
+            Component name
+            <input
+              name="name"
+              type="text"
+              placeholder="Enter component name"
+              required
+            >
+          </label>
+
+          <label>
+            Category
+            <input
+              name="category"
+              type="text"
+              placeholder="Enter category"
+              required
+            >
+          </label>
+
+          <label>
+            Quantity
+            <input
+              name="quantity"
+              type="number"
+              min="0"
+              placeholder="Enter quantity"
+              required
+            >
+          </label>
+
+          <label>
+            Unit price (₹)
+            <input
+              name="unit_price"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Enter unit price"
+              required
+            >
+          </label>
+
+          <label>
+            Supplier
+            <input
+              name="supplier"
+              type="text"
+              placeholder="Enter supplier name"
+              required
+            >
+          </label>
+
+          <label>
+            Reorder level
+            <input
+              name="reorder_level"
+              type="number"
+              min="0"
+              value="5"
+              required
+            >
+          </label>
+
+          <div class="form-actions">
+            <button type="submit">Add component</button>
+
+            <button id="cancel-add" type="button">
+              Cancel
+            </button>
+          </div>
+
+        </form>
+
+        <p id="form-error" class="error" role="alert"></p>
+      </section>
+
+    </section>
+
   </main>
-<script src="/static/app.js"></script>
-</body></html>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

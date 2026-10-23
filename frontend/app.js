@@ -1,10 +1,10 @@
-
 let token = localStorage.getItem('eims_token');
 let role = localStorage.getItem('eims_role');
 
 const $ = id => document.getElementById(id);
 
-// API helper
+// ==================== API HELPER ====================
+
 async function api(path, options = {}) {
   options.headers = {
     ...(options.headers || {}),
@@ -28,7 +28,8 @@ async function api(path, options = {}) {
   return response.json();
 }
 
-// Login and application visibility
+// ==================== LOGIN / LOGOUT ====================
+
 function setLoggedIn() {
   $('login-card').classList.toggle('hidden', !!token);
   $('app').classList.toggle('hidden', !token);
@@ -88,12 +89,16 @@ $('logout').onclick = () => {
   setLoggedIn();
 };
 
-// Inventory controls
+// ==================== INVENTORY CONTROLS ====================
+
 $('refresh').onclick = refresh;
 $('search').oninput = refresh;
+$('category').onchange = refresh;
+$('supplier').onchange = refresh;
 $('status').onchange = refresh;
 
-// Add-component form visibility
+// ==================== ADD COMPONENT FORM ====================
+
 $('add-btn').onclick = () => {
   $('form-card').classList.remove('hidden');
 };
@@ -103,7 +108,7 @@ $('cancel-add').onclick = () => {
   $('form-error').textContent = '';
 };
 
-// Add a component
+// Add component
 $('component-form').onsubmit = async event => {
   event.preventDefault();
   $('form-error').textContent = '';
@@ -132,21 +137,49 @@ $('component-form').onsubmit = async event => {
   }
 };
 
-// Load and display inventory
+// ==================== LOAD AND FILTER INVENTORY ====================
+
 async function refresh() {
   if (!token) return;
+
+  $('inventory').innerHTML = `
+    <tr>
+      <td colspan="9">Loading inventory...</td>
+    </tr>
+  `;
 
   try {
     const query = new URLSearchParams();
 
-    if ($('search').value.trim()) {
-      query.set('search', $('search').value.trim());
+    // Search by name, SKU, or category
+    const search = $('search').value.trim();
+
+    if (search) {
+      query.set('search', search);
     }
 
-    if ($('status').value) {
-      query.set('status', $('status').value);
+    // Filter by category
+    const category = $('category').value;
+
+    if (category) {
+      query.set('category', category);
     }
 
+    // Filter by supplier
+    const supplier = $('supplier').value;
+
+    if (supplier) {
+      query.set('supplier', supplier);
+    }
+
+    // Filter by stock status
+    const statusFilter = $('status').value;
+
+    if (statusFilter) {
+      query.set('status', statusFilter);
+    }
+
+    // Send all selected filters in one request
     const [items, dashboard] = await Promise.all([
       api('/api/inventory?' + query.toString()),
       api('/api/dashboard')
@@ -170,19 +203,22 @@ async function refresh() {
       </div>
     `;
 
-    // Empty inventory state
-    if (items.length === 0) {
+    // Handle empty results
+    if (!items.length) {
       $('inventory').innerHTML = `
         <tr>
-          <td colspan="9">No inventory components found.</td>
+          <td colspan="9">
+            No matching components found.
+            Try changing or clearing your filters.
+          </td>
         </tr>
       `;
       return;
     }
 
-    // Inventory table
+    // Display matching components
     $('inventory').innerHTML = items.map(component => {
-      const status =
+      const stockStatus =
         component.quantity === 0
           ? 'out-of-stock'
           : component.quantity <= component.reorder_level
@@ -202,7 +238,7 @@ async function refresh() {
           <td>₹${Number(component.unit_price).toFixed(2)}</td>
           <td>${escapeHTML(component.supplier)}</td>
           <td>${component.reorder_level}</td>
-          <td class="status">${status}</td>
+          <td class="status">${stockStatus}</td>
           <td>${action}</td>
         </tr>
       `;
@@ -222,20 +258,25 @@ async function refresh() {
       localStorage.removeItem('eims_role');
 
       setLoggedIn();
+
       $('login-error').textContent =
         'Your session expired. Please log in again.';
+
       return;
     }
 
     $('inventory').innerHTML = `
       <tr>
-        <td colspan="9">Unable to load inventory. Please try refreshing.</td>
+        <td colspan="9">
+          Unable to load inventory. Please try refreshing.
+        </td>
       </tr>
     `;
   }
 }
 
-// Escape text returned by the API before inserting it into HTML
+// ==================== HTML ESCAPING ====================
+
 function escapeHTML(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({
     '&': '&amp;',
@@ -246,9 +287,12 @@ function escapeHTML(value) {
   })[character]);
 }
 
-// Delete a component (admin/manager only)
+// ==================== DELETE COMPONENT ====================
+
 window.removeItem = async id => {
-  if (!confirm('Delete this component?')) return;
+  if (!confirm('Are you sure you want to delete this component?')) {
+    return;
+  }
 
   try {
     await api(`/api/inventory/${id}`, {
@@ -261,5 +305,6 @@ window.removeItem = async id => {
   }
 };
 
-// Initialize the application
+// ==================== INITIALIZE APPLICATION ====================
+
 setLoggedIn();
