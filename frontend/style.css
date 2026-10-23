@@ -762,6 +762,39 @@ td button:hover {
   background: #fff4f2;
 }
 
+.details-edit-button {
+  margin-top: 16px;
+}
+
+.component-edit-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.component-edit-form label {
+  display: grid;
+  gap: 6px;
+  color: #59677c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.component-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  grid-column: 1 / -1;
+  gap: 9px;
+}
+
+.component-edit-form .details-error {
+  grid-column: 1 / -1;
+}
+
+.component-edit-form .details-error:empty {
+  display: none;
+}
+
 #form-card {
   padding: 24px;
 }
@@ -921,6 +954,15 @@ button.hidden {
 
   .component-dialog {
     padding: 19px;
+  }
+
+  .component-edit-form {
+    grid-template-columns: 1fr;
+  }
+
+  .component-edit-form .details-error,
+  .component-edit-actions {
+    grid-column: auto;
   }
 }
 

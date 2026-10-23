@@ -22,7 +22,10 @@ async function api(path, options = {}) {
       // Response was not JSON.
     }
 
-    throw new Error(data.detail || `HTTP ${response.status}`);
+    const message = Array.isArray(data.detail)
+      ? data.detail.map(issue => issue.msg).join(', ')
+      : data.detail;
+    throw new Error(message || `HTTP ${response.status}`);
   }
 
   return response.json();
@@ -111,6 +114,52 @@ $('inventory').addEventListener('click', event => {
     showComponentDetails(componentButton.dataset.componentId);
   }
 });
+$('component-details').addEventListener('click', event => {
+  if (event.target.closest('[data-edit-component]') && currentComponent) {
+    renderComponentEditForm(currentComponent);
+  }
+  if (event.target.closest('[data-cancel-edit]') && currentComponent) {
+    renderComponentDetails(currentComponent);
+  }
+});
+$('component-details').addEventListener('submit', async event => {
+  if (event.target.id !== 'component-edit-form') return;
+  event.preventDefault();
+
+  const form = event.target;
+  const errorElement = $('component-edit-error');
+  const saveButton = form.querySelector('[type="submit"]');
+  errorElement.textContent = '';
+  saveButton.disabled = true;
+  saveButton.textContent = 'Saving...';
+
+  const formData = new FormData(form);
+  const updates = {
+    quantity: Number(formData.get('quantity')),
+    unit_price: Number(formData.get('unit_price')),
+    supplier: String(formData.get('supplier')).trim(),
+    reorder_level: Number(formData.get('reorder_level'))
+  };
+
+  try {
+    const updatedComponent = await api(
+      `/api/inventory/${currentComponent.id}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      }
+    );
+
+    currentComponent = updatedComponent;
+    await refresh();
+    renderComponentDetails(currentComponent);
+  } catch (error) {
+    errorElement.textContent = error.message;
+    saveButton.disabled = false;
+    saveButton.textContent = 'Save changes';
+  }
+});
 $('close-component-dialog').onclick = () => $('component-dialog').close();
 $('component-dialog').addEventListener('click', event => {
   if (event.target === $('component-dialog')) {
@@ -168,6 +217,8 @@ $('component-form').onsubmit = async event => {
 };
 
 // ==================== LOAD AND FILTER INVENTORY ====================
+
+let currentComponent = null;
 
 async function refresh() {
   if (!token) return;
@@ -342,22 +393,36 @@ async function refresh() {
 async function showComponentDetails(componentId) {
   const dialog = $('component-dialog');
   const details = $('component-details');
+  currentComponent = null;
   details.innerHTML = '<p class="details-message">Loading component details...</p>';
   dialog.showModal();
 
   try {
-    const component = await api(`/api/inventory/${componentId}`);
-    const stockStatus = component.quantity === 0
+    currentComponent = await api(`/api/inventory/${componentId}`);
+    renderComponentDetails(currentComponent);
+  } catch (error) {
+    console.error('Failed to load component details:', error);
+    details.innerHTML = `
+      <p class="details-error" role="alert">
+        Unable to load component details. ${escapeHTML(error.message)}
+      </p>
+    `;
+  }
+}
+
+function renderComponentDetails(component) {
+  const details = $('component-details');
+  const stockStatus = component.quantity === 0
       ? 'out-of-stock'
       : component.quantity <= component.reorder_level
         ? 'low-stock'
         : 'in-stock';
-    const statusLabel = {
-      'in-stock': 'In stock',
-      'low-stock': 'Low stock',
-      'out-of-stock': 'Out of stock'
-    }[stockStatus];
-    const dateAdded = role === 'ADMIN' && component.created_at
+  const statusLabel = {
+    'in-stock': 'In stock',
+    'low-stock': 'Low stock',
+    'out-of-stock': 'Out of stock'
+  }[stockStatus];
+  const dateAdded = role === 'ADMIN' && component.created_at
       ? `
         <div class="detail-item">
           <dt>Date added</dt>
@@ -368,48 +433,73 @@ async function showComponentDetails(componentId) {
         </div>
       `
       : '';
-    details.innerHTML = `
-      <p class="component-detail-category">${escapeHTML(component.category)}</p>
-      <dl class="details-grid">
-        <div class="detail-item detail-name">
-          <dt>Component</dt>
-          <dd>${escapeHTML(component.name)}</dd>
-        </div>
-        <div class="detail-item">
-          <dt>SKU</dt>
-          <dd>${escapeHTML(component.sku)}</dd>
-        </div>
-        <div class="detail-item">
-          <dt>Stock status</dt>
-          <dd><span class="status-badge status-${stockStatus}">${statusLabel}</span></dd>
-        </div>
-        <div class="detail-item">
-          <dt>Quantity in stock</dt>
-          <dd>${component.quantity}</dd>
-        </div>
-        <div class="detail-item">
-          <dt>Unit price</dt>
-          <dd>₹${Number(component.unit_price).toFixed(2)}</dd>
-        </div>
-        <div class="detail-item">
-          <dt>Supplier</dt>
-          <dd>${escapeHTML(component.supplier)}</dd>
-        </div>
-        <div class="detail-item">
-          <dt>Reorder level</dt>
-          <dd>${component.reorder_level}</dd>
-        </div>
-        ${dateAdded}
-      </dl>
-    `;
-  } catch (error) {
-    console.error('Failed to load component details:', error);
-    details.innerHTML = `
-      <p class="details-error" role="alert">
-        Unable to load component details. ${escapeHTML(error.message)}
-      </p>
-    `;
-  }
+  const editButton = ['ADMIN', 'MANAGER'].includes(role)
+    ? '<button class="details-edit-button" type="button" data-edit-component>Edit details</button>'
+    : '';
+
+  details.innerHTML = `
+    <p class="component-detail-category">${escapeHTML(component.category)}</p>
+    <dl class="details-grid">
+      <div class="detail-item detail-name">
+        <dt>Component</dt>
+        <dd>${escapeHTML(component.name)}</dd>
+      </div>
+      <div class="detail-item">
+        <dt>SKU</dt>
+        <dd>${escapeHTML(component.sku)}</dd>
+      </div>
+      <div class="detail-item">
+        <dt>Stock status</dt>
+        <dd><span class="status-badge status-${stockStatus}">${statusLabel}</span></dd>
+      </div>
+      <div class="detail-item">
+        <dt>Quantity in stock</dt>
+        <dd>${component.quantity}</dd>
+      </div>
+      <div class="detail-item">
+        <dt>Unit price</dt>
+        <dd>₹${Number(component.unit_price).toFixed(2)}</dd>
+      </div>
+      <div class="detail-item">
+        <dt>Supplier</dt>
+        <dd>${escapeHTML(component.supplier)}</dd>
+      </div>
+      <div class="detail-item">
+        <dt>Reorder level</dt>
+        <dd>${component.reorder_level}</dd>
+      </div>
+      ${dateAdded}
+    </dl>
+    ${editButton}
+  `;
+}
+
+function renderComponentEditForm(component, errorMessage = '') {
+  $('component-details').innerHTML = `
+    <form id="component-edit-form" class="component-edit-form">
+      <label>
+        Quantity
+        <input name="quantity" type="number" min="0" step="1" value="${component.quantity}" required>
+      </label>
+      <label>
+        Unit price (₹)
+        <input name="unit_price" type="number" min="0" step="0.01" value="${component.unit_price}" required>
+      </label>
+      <label>
+        Supplier
+        <input name="supplier" type="text" maxlength="120" value="${escapeHTML(component.supplier)}" required>
+      </label>
+      <label>
+        Reorder level
+        <input name="reorder_level" type="number" min="0" step="1" value="${component.reorder_level}" required>
+      </label>
+      <p id="component-edit-error" class="details-error" role="alert">${escapeHTML(errorMessage)}</p>
+      <div class="component-edit-actions">
+        <button class="secondary-button" type="button" data-cancel-edit>Cancel</button>
+        <button type="submit">Save changes</button>
+      </div>
+    </form>
+  `;
 }
 
 // ==================== HTML ESCAPING ====================
