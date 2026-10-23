@@ -14,7 +14,7 @@ class ComponentCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     category: str = Field(min_length=1, max_length=80)
     quantity: int = Field(ge=0)
-    unit_price: float = Field(ge=0)
+    unit_price: float = Field(ge=0, allow_inf_nan=False)
     supplier: str = Field(min_length=1, max_length=120)
     reorder_level: int = Field(default=5, ge=0)
     image_url: str | None = Field(default=None, max_length=500)
