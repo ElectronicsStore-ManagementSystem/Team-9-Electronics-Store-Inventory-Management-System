@@ -30,7 +30,7 @@ The supplied project baseline also specifies reporting, exports, charts, low-sto
 - Vanilla HTML/CSS/JavaScript frontend served by FastAPI
 - GitHub Actions
 
-The architecture keeps the API/data layers separate so the development database can be replaced later without changing the public API contract.
+The application separates the frontend, HTTP API, business rules, and persistence operations. See [Architecture and module responsibilities](docs/ARCHITECTURE.md) for the current structure and request flow, and [API reference](docs/API.md) for endpoint details.
 
 ## Run locally
 

@@ -50,9 +50,19 @@ class ComponentCreate(BaseModel):
     
 class ComponentUpdate(BaseModel):
     quantity: int | None = Field(default=None, ge=0)
-    unit_price: float | None = Field(default=None, ge=0)
+    unit_price: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     supplier: str | None = Field(default=None, min_length=1, max_length=120)
     reorder_level: int | None = Field(default=None, ge=0)
+
+    @field_validator("supplier")
+    @classmethod
+    def trim_supplier(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            raise ValueError("Supplier cannot be blank")
+        return value
 
 class ComponentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -66,7 +76,7 @@ class ComponentResponse(BaseModel):
     reorder_level: int
     image_url: str | None
     active: bool
-    created_at: datetime
+    created_at: datetime | None = None
 
 class AvailabilityResponse(ComponentResponse):
     status: str

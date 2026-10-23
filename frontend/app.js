@@ -21,17 +21,21 @@ async function api(path, options = {}) {
     } catch {
       // Response was not JSON.
     }
+     const message = Array.isArray(data.detail)
+      ? data.detail.map(issue => issue.msg).join(', ')
+      : data.detail;
 
     const error = new Error(
-      typeof data.detail === 'string'
-        ? data.detail
-        : `Request failed with status ${response.status}`
+      typeof message === 'string' && message
+        ? message
+        : `HTTP ${response.status}`
     );
 
     error.status = response.status;
     error.details = Array.isArray(data.detail) ? data.detail : [];
 
     throw error;
+
   }
 
   return response.json();
@@ -44,6 +48,13 @@ function setLoggedIn() {
   $('login-card').classList.toggle('hidden', !!token);
   $('app').classList.toggle('hidden', !token);
   $('logout').classList.toggle('hidden', !token);
+  const dateSortOption = $('sort-by').querySelector('[data-admin-only]');
+  dateSortOption.hidden = role !== 'ADMIN';
+  dateSortOption.disabled = role !== 'ADMIN';
+
+  if (role !== 'ADMIN' && $('sort-by').value === 'date_added') {
+    $('sort-by').value = 'id';
+  }
 
   $('add-btn').classList.toggle(
     'hidden',
@@ -95,6 +106,8 @@ $('logout').onclick = () => {
   $('inventory').innerHTML = '';
   $('stats').innerHTML = '';
   $('form-card').classList.add('hidden');
+  $('add-feedback').classList.add('hidden');
+  $('add-feedback').textContent = '';
 
   setLoggedIn();
 };
@@ -106,6 +119,75 @@ $('search').oninput = refresh;
 $('category').onchange = refresh;
 $('supplier').onchange = refresh;
 $('status').onchange = refresh;
+$('sort-by').onchange = refresh;
+$('sort-order').onchange = refresh;
+$('inventory').addEventListener('click', event => {
+  const componentButton = event.target.closest('[data-component-id]');
+  if (componentButton) {
+    showComponentDetails(componentButton.dataset.componentId);
+  }
+});
+$('component-details').addEventListener('click', event => {
+  if (event.target.closest('[data-edit-component]') && currentComponent) {
+    renderComponentEditForm(currentComponent);
+  }
+  if (event.target.closest('[data-cancel-edit]') && currentComponent) {
+    renderComponentDetails(currentComponent);
+  }
+});
+$('component-details').addEventListener('submit', async event => {
+  if (event.target.id !== 'component-edit-form') return;
+  event.preventDefault();
+
+  const form = event.target;
+  const errorElement = $('component-edit-error');
+  const saveButton = form.querySelector('[type="submit"]');
+  errorElement.textContent = '';
+  saveButton.disabled = true;
+  saveButton.textContent = 'Saving...';
+
+  const formData = new FormData(form);
+  const updates = {
+    quantity: Number(formData.get('quantity')),
+    unit_price: Number(formData.get('unit_price')),
+    supplier: String(formData.get('supplier')).trim(),
+    reorder_level: Number(formData.get('reorder_level'))
+  };
+
+  try {
+    const updatedComponent = await api(
+      `/api/inventory/${currentComponent.id}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates)
+      }
+    );
+
+    currentComponent = updatedComponent;
+    await refresh();
+    renderComponentDetails(currentComponent);
+  } catch (error) {
+    errorElement.textContent = error.message;
+    saveButton.disabled = false;
+    saveButton.textContent = 'Save changes';
+  }
+});
+$('close-component-dialog').onclick = () => $('component-dialog').close();
+$('component-dialog').addEventListener('click', event => {
+  if (event.target === $('component-dialog')) {
+    $('component-dialog').close();
+  }
+});
+$('clear-filters').onclick = () => {
+  $('search').value = '';
+  $('category').value = '';
+  $('supplier').value = '';
+  $('status').value = '';
+  $('sort-by').value = 'id';
+  $('sort-order').value = 'asc';
+  refresh();
+};
 
 const componentFields = [
   'name',
@@ -207,13 +289,28 @@ function displayValidationErrors(details) {
 // ==================== ADD COMPONENT FORM ====================
 
 $('add-btn').onclick = () => {
+  $('add-feedback').classList.add('hidden');
+  $('add-feedback').textContent = '';
   $('form-card').classList.remove('hidden');
+  $('form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
 $('cancel-add').onclick = () => {
   $('form-card').classList.add('hidden');
   $('form-error').textContent = '';
 };
+
+const addTextFields = {
+  name: 'Component name',
+  category: 'Category',
+  supplier: 'Supplier'
+};
+for (const fieldName of Object.keys(addTextFields)) {
+  $('component-form').elements.namedItem(fieldName).addEventListener(
+    'input',
+    event => event.target.setCustomValidity('')
+  );
+}
 
 // Add component
 // Add component
@@ -229,16 +326,34 @@ $('component-form').onsubmit = async event => {
     return;
   }
 
-  const data = Object.fromEntries(
-    new FormData(form).entries()
-  );
+  for (const [fieldName, label] of Object.entries(addTextFields)) {
+    const field = form.elements.namedItem(fieldName);
+    field.value = field.value.trim();
+    field.setCustomValidity(
+      field.value ? '' : `${label} is required.`
+    );
+  }
+
+  if (!form.reportValidity()) {
+    return;
+  }
+
+  const data = Object.fromEntries(new FormData(form).entries());
 
   data.name = data.name.trim();
   data.category = data.category.trim();
   data.supplier = data.supplier.trim();
   data.quantity = Number(data.quantity);
   data.unit_price = Number(data.unit_price);
-  data.reorder_level = Number(data.reorder_level);
+  if (data.reorder_level === '') {
+    delete data.reorder_level;
+  } else {
+    data.reorder_level = Number(data.reorder_level);
+  }
+
+  const submitButton = form.querySelector('[type="submit"]');
+  submitButton.disabled = true;
+  submitButton.textContent = 'Saving...';
 
   // Validate text fields before making an API request.
   let hasErrors = false;
@@ -292,7 +407,7 @@ $('component-form').onsubmit = async event => {
   }
 
   try {
-    await api('/api/inventory', {
+    const component = await api('/api/inventory', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -300,9 +415,18 @@ $('component-form').onsubmit = async event => {
 
     form.reset();
     clearFieldErrors();
-
+    
     $('form-card').classList.add('hidden');
+    $('add-feedback').textContent =
+      `${component.name} added successfully (SKU: ${component.sku}).`;
+    $('add-feedback').classList.remove('hidden');
 
+    $('search').value = '';
+    $('category').value = '';
+    $('supplier').value = '';
+    $('status').value = '';
+    $('sort-by').value = 'id';
+    $('sort-order').value = 'asc';
     await refresh();
   } catch (error) {
     if (error.status === 422) {
@@ -311,10 +435,15 @@ $('component-form').onsubmit = async event => {
       $('form-error').textContent =
         error.message || 'Unable to save the component. Please try again.';
     }
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = 'Add component';
   }
 };
 
 // ==================== LOAD AND FILTER INVENTORY ====================
+
+let currentComponent = null;
 
 async function refresh() {
   if (!token) return;
@@ -356,6 +485,15 @@ async function refresh() {
       query.set('status', statusFilter);
     }
 
+    // Sort inventory
+    const sortBy = $('sort-by').value;
+    const sortOrder = $('sort-order').value;
+
+    query.set(
+      'sort',
+      sortOrder === 'desc' ? `-${sortBy}` : sortBy
+    );
+
     // Send all selected filters in one request
     const [items, dashboard] = await Promise.all([
       api('/api/inventory?' + query.toString()),
@@ -365,20 +503,32 @@ async function refresh() {
     // Dashboard statistics
     $('stats').innerHTML = `
       <div class="stat">
-        Total components
-        <b>${dashboard.total_components}</b>
+        <span class="stat-icon" aria-hidden="true">#</span>
+        <span class="stat-copy">
+          <span class="stat-label">Total components</span>
+          <b>${dashboard.total_components}</b>
+        </span>
       </div>
 
       <div class="stat">
-        Stock value
-        <b>₹${Number(dashboard.total_stock_value).toFixed(2)}</b>
+        <span class="stat-icon" aria-hidden="true">₹</span>
+        <span class="stat-copy">
+          <span class="stat-label">Stock value</span>
+          <b>₹${Number(dashboard.total_stock_value).toFixed(2)}</b>
+        </span>
       </div>
 
       <div class="stat">
-        Low stock
-        <b>${dashboard.low_stock_count}</b>
+        <span class="stat-icon" aria-hidden="true">!</span>
+        <span class="stat-copy">
+          <span class="stat-label">Low stock items</span>
+          <b>${dashboard.low_stock_count}</b>
+        </span>
       </div>
     `;
+
+    $('results-count').textContent =
+      `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
 
     // Handle empty results
     if (!items.length) {
@@ -402,6 +552,12 @@ async function refresh() {
             ? 'low-stock'
             : 'in-stock';
 
+      const statusLabel = {
+        'in-stock': 'In stock',
+        'low-stock': 'Low stock',
+        'out-of-stock': 'Out of stock'
+      }[stockStatus];
+
       const action = ['ADMIN', 'MANAGER'].includes(role)
         ? `<button onclick="removeItem(${component.id})">Delete</button>`
         : 'Read only';
@@ -409,13 +565,20 @@ async function refresh() {
       return `
         <tr>
           <td>${escapeHTML(component.sku)}</td>
-          <td>${escapeHTML(component.name)}</td>
+          <td>
+            <button
+              class="component-link"
+              type="button"
+              data-component-id="${component.id}"
+              aria-label="View details for ${escapeHTML(component.name)}"
+            >${escapeHTML(component.name)}</button>
+          </td>
           <td>${escapeHTML(component.category)}</td>
           <td>${component.quantity}</td>
           <td>₹${Number(component.unit_price).toFixed(2)}</td>
           <td>${escapeHTML(component.supplier)}</td>
           <td>${component.reorder_level}</td>
-          <td class="status">${stockStatus}</td>
+          <td><span class="status-badge status-${stockStatus}">${statusLabel}</span></td>
           <td>${action}</td>
         </tr>
       `;
@@ -450,6 +613,118 @@ async function refresh() {
       </tr>
     `;
   }
+}
+
+async function showComponentDetails(componentId) {
+  const dialog = $('component-dialog');
+  const details = $('component-details');
+  currentComponent = null;
+  details.innerHTML = '<p class="details-message">Loading component details...</p>';
+  dialog.showModal();
+
+  try {
+    currentComponent = await api(`/api/inventory/${componentId}`);
+    renderComponentDetails(currentComponent);
+  } catch (error) {
+    console.error('Failed to load component details:', error);
+    details.innerHTML = `
+      <p class="details-error" role="alert">
+        Unable to load component details. ${escapeHTML(error.message)}
+      </p>
+    `;
+  }
+}
+
+function renderComponentDetails(component) {
+  const details = $('component-details');
+  const stockStatus = component.quantity === 0
+      ? 'out-of-stock'
+      : component.quantity <= component.reorder_level
+        ? 'low-stock'
+        : 'in-stock';
+  const statusLabel = {
+    'in-stock': 'In stock',
+    'low-stock': 'Low stock',
+    'out-of-stock': 'Out of stock'
+  }[stockStatus];
+  const dateAdded = role === 'ADMIN' && component.created_at
+      ? `
+        <div class="detail-item">
+          <dt>Date added</dt>
+          <dd>${escapeHTML(new Intl.DateTimeFormat(undefined, {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+          }).format(new Date(component.created_at)))}</dd>
+        </div>
+      `
+      : '';
+  const editButton = ['ADMIN', 'MANAGER'].includes(role)
+    ? '<button class="details-edit-button" type="button" data-edit-component>Edit details</button>'
+    : '';
+
+  details.innerHTML = `
+    <p class="component-detail-category">${escapeHTML(component.category)}</p>
+    <dl class="details-grid">
+      <div class="detail-item detail-name">
+        <dt>Component</dt>
+        <dd>${escapeHTML(component.name)}</dd>
+      </div>
+      <div class="detail-item">
+        <dt>SKU</dt>
+        <dd>${escapeHTML(component.sku)}</dd>
+      </div>
+      <div class="detail-item">
+        <dt>Stock status</dt>
+        <dd><span class="status-badge status-${stockStatus}">${statusLabel}</span></dd>
+      </div>
+      <div class="detail-item">
+        <dt>Quantity in stock</dt>
+        <dd>${component.quantity}</dd>
+      </div>
+      <div class="detail-item">
+        <dt>Unit price</dt>
+        <dd>₹${Number(component.unit_price).toFixed(2)}</dd>
+      </div>
+      <div class="detail-item">
+        <dt>Supplier</dt>
+        <dd>${escapeHTML(component.supplier)}</dd>
+      </div>
+      <div class="detail-item">
+        <dt>Reorder level</dt>
+        <dd>${component.reorder_level}</dd>
+      </div>
+      ${dateAdded}
+    </dl>
+    ${editButton}
+  `;
+}
+
+function renderComponentEditForm(component, errorMessage = '') {
+  $('component-details').innerHTML = `
+    <form id="component-edit-form" class="component-edit-form">
+      <label>
+        Quantity
+        <input name="quantity" type="number" min="0" step="1" value="${component.quantity}" required>
+      </label>
+      <label>
+        Unit price (₹)
+        <input name="unit_price" type="number" min="0" step="0.01" value="${component.unit_price}" required>
+      </label>
+      <label>
+        Supplier
+        <input name="supplier" type="text" maxlength="120" value="${escapeHTML(component.supplier)}" required>
+      </label>
+      <label>
+        Reorder level
+        <input name="reorder_level" type="number" min="0" step="1" value="${component.reorder_level}" required>
+      </label>
+      <p id="component-edit-error" class="details-error" role="alert">${escapeHTML(errorMessage)}</p>
+      <div class="component-edit-actions">
+        <button class="secondary-button" type="button" data-cancel-edit>Cancel</button>
+        <button type="submit">Save changes</button>
+      </div>
+    </form>
+  `;
 }
 
 // ==================== HTML ESCAPING ====================

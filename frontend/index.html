@@ -12,16 +12,23 @@
 <body>
   <main class="container">
 
-    <!-- Header -->
     <header>
-      <div>
-        <h1>Electronics Store Inventory Management System</h1>
-        <p>Manage components, suppliers, and stock levels.</p>
-      </div>
+      <a class="brand" href="/" aria-label="Electronics inventory home">
+        <span class="brand-mark" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </span>
+        <span class="brand-copy">
+          <strong>COMPONENTS</strong>
+          <small>Inventory workspace</small>
+        </span>
+      </a>
 
-      <button id="logout" class="hidden" type="button">
-        Logout
-      </button>
+      <div class="header-actions">
+        <span class="workspace-label">Store workspace</span>
+        <button id="logout" class="hidden secondary-button" type="button">
+          Log out
+        </button>
+      </div>
     </header>
 
     <!-- Login -->
@@ -60,44 +67,100 @@
     <section id="app" class="hidden">
 
       <!-- Inventory heading -->
-      <section class="card">
-        <h2>Inventory</h2>
-        <p>Search and filter components to find the items you need.</p>
+      <section class="inventory-section">
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">INVENTORY MANAGEMENT</p>
+            <h1>Inventory</h1>
+            <p>Track your components, stock levels, and suppliers.</p>
+          </div>
+          <span class="live-indicator"><span></span> Live inventory</span>
+        </div>
 
-        <!-- Search and filters -->
-        <div class="toolbar">
+        <div class="inventory-controls">
+          <div class="search-row">
+            <label class="search-box">
+              <span class="search-icon" aria-hidden="true"></span>
+              <input
+                id="search"
+                type="search"
+                placeholder="Search by name, SKU, or category"
+                aria-label="Search inventory"
+              >
+            </label>
 
-          <input
-            id="search"
-            type="search"
-            placeholder="Search name, SKU or category"
-            aria-label="Search inventory"
-          >
+            <div class="search-actions">
+              <button id="refresh" class="secondary-button" type="button">
+                <span class="refresh-icon" aria-hidden="true">↻</span>
+                Refresh
+              </button>
+              <button id="add-btn" class="hidden" type="button">
+                <span aria-hidden="true">+</span> Add component
+              </button>
+            </div>
+          </div>
 
-          <select id="category" aria-label="Filter by category">
-            <option value="">All categories</option>
-            <option value="Microcontroller">Microcontroller</option>
-            <option value="Sensor">Sensor</option>
-            <option value="Display">Display</option>
-          </select>
+          <details class="filter-panel">
+            <summary>
+              <span>Filters &amp; sorting</span>
+              <span class="filter-hint">Optional</span>
+            </summary>
 
-          <select id="supplier" aria-label="Filter by supplier">
-            <option value="">All suppliers</option>
-            <option value="TechSource">TechSource</option>
-          </select>
+            <div class="filter-grid">
+              <label>
+                Category
+                <select id="category" aria-label="Filter by category">
+                  <option value="">All categories</option>
+                  <option value="Microcontroller">Microcontroller</option>
+                  <option value="Sensor">Sensor</option>
+                  <option value="Display">Display</option>
+                </select>
+              </label>
 
-          <select id="status" aria-label="Filter by stock status">
-            <option value="">All stock statuses</option>
-            <option value="in-stock">In stock</option>
-            <option value="low-stock">Low stock</option>
-            <option value="out-of-stock">Out of stock</option>
-          </select>
+              <label>
+                Supplier
+                <select id="supplier" aria-label="Filter by supplier">
+                  <option value="">All suppliers</option>
+                  <option value="TechSource">TechSource</option>
+                </select>
+              </label>
 
-          <button id="refresh" type="button">Refresh</button>
+              <label>
+                Stock status
+                <select id="status" aria-label="Filter by stock status">
+                  <option value="">All stock statuses</option>
+                  <option value="in-stock">In stock</option>
+                  <option value="low-stock">Low stock</option>
+                  <option value="out-of-stock">Out of stock</option>
+                </select>
+              </label>
 
-          <button id="add-btn" class="hidden" type="button">
-            Add component
-          </button>
+              <label>
+                Sort by
+                <select id="sort-by" aria-label="Sort inventory by">
+                  <option value="id">Default</option>
+                  <option value="name">Name (A-Z)</option>
+                  <option value="quantity">Quantity</option>
+                  <option value="unit_price">Unit price</option>
+                  <option value="date_added" data-admin-only>Date added</option>
+                </select>
+              </label>
+
+              <label>
+                Order
+                <select id="sort-order" aria-label="Sort order">
+                  <option value="asc">Ascending</option>
+                  <option value="desc">Descending</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="filter-actions">
+              <button id="clear-filters" class="text-button" type="button">
+                Clear all
+              </button>
+            </div>
+          </details>
         </div>
       </section>
 
@@ -105,9 +168,17 @@
       <section id="stats" class="stats" aria-label="Inventory statistics">
       </section>
 
+      <p id="add-feedback" class="form-feedback hidden" role="status" aria-live="polite"></p>
+
       <!-- Inventory table -->
-      <section class="card">
-        <h2>Components</h2>
+      <section class="table-card">
+        <div class="table-heading">
+          <div>
+            <h2>Components</h2>
+            <p>Review and manage items in your catalog.</p>
+          </div>
+          <span id="results-count" class="results-count" aria-live="polite"></span>
+        </div>
 
         <div class="table-container">
           <table>
@@ -134,10 +205,31 @@
         </div>
       </section>
 
+      <dialog id="component-dialog" class="component-dialog" aria-labelledby="component-dialog-title">
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">COMPONENT DETAILS</p>
+            <h2 id="component-dialog-title">Component information</h2>
+          </div>
+          <button id="close-component-dialog" class="secondary-button dialog-close" type="button" aria-label="Close component details">
+            ×
+          </button>
+        </div>
+        <div id="component-details" class="component-details" aria-live="polite"></div>
+      </dialog>
+
       <!-- Add component form -->
       <section id="form-card" class="card hidden">
-        <h2>Add component</h2>
-        <p>Enter the component details below.</p>
+        <div class="form-heading">
+          <div>
+            <p class="eyebrow">CATALOG</p>
+            <h2>Add component</h2>
+            <p>Add a new item to your inventory.</p>
+          </div>
+          <button id="cancel-add" class="secondary-button" type="button">
+            Cancel
+          </button>
+        </div>
 
         <form id="component-form" class="grid">
 
@@ -217,13 +309,12 @@
           </label>
 
           <label>
-            Reorder level
+            Reorder level (optional)
             <input
               name="reorder_level"
               type="number"
               min="0"
               value="5"
-              required
             >
             <span
   id="reorder_level-error"
@@ -233,11 +324,7 @@
           </label>
 
           <div class="form-actions">
-            <button type="submit">Add component</button>
-
-            <button id="cancel-add" type="button">
-              Cancel
-            </button>
+            <button type="submit">Save component</button>
           </div>
 
         </form>
