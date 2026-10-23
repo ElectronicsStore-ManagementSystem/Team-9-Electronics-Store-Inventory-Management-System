@@ -1411,3 +1411,60 @@ button.hidden {
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* EIMS-F-012: Delete confirmation dialog */
+
+.delete-confirmation-dialog {
+width: min(100% - 32px, 480px);
+}
+
+.delete-confirmation-dialog > p {
+line-height: 1.6;
+}
+
+.delete-component-summary {
+display: grid;
+gap: 12px;
+margin: 20px 0;
+padding: 16px;
+border: 1px solid var(--border);
+border-radius: 12px;
+background: var(--surface);
+}
+
+.delete-component-summary > div {
+display: grid;
+gap: 5px;
+}
+
+.delete-component-summary span {
+color: var(--muted);
+font-size: 13px;
+}
+
+.delete-component-summary strong {
+overflow-wrap: anywhere;
+color: var(--text);
+}
+
+.delete-confirmation-actions {
+display: flex;
+justify-content: flex-end;
+gap: 12px;
+margin-top: 20px;
+}
+
+.delete-confirm-button {
+background: #b42318;
+border-color: #b42318;
+}
+
+.delete-confirm-button:hover {
+background: #912018;
+border-color: #912018;
+}
+
+.delete-confirm-button:disabled {
+opacity: 0.65;
+cursor: not-allowed;
+}

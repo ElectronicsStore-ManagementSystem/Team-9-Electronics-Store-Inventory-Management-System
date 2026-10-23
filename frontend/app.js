@@ -965,24 +965,107 @@ function escapeHTML(value) {
 
 // ==================== DELETE COMPONENT ====================
 
+let pendingDeleteComponentId = null;
+
+const deleteConfirmationDialog = $('delete-confirmation-dialog');
+const deleteComponentName = $('delete-component-name');
+const deleteComponentSku = $('delete-component-sku');
+const deleteConfirmationError = $('delete-confirmation-error');
+const confirmDeleteButton = $('confirm-delete-component');
+
+function closeDeleteConfirmation() {
+if (confirmDeleteButton.disabled) {
+return;
+}
+
+pendingDeleteComponentId = null;
+deleteConfirmationError.textContent = '';
+deleteConfirmationDialog.close();
+}
 
 window.removeItem = async id => {
-  if (!confirm('Are you sure you want to delete this component?')) {
-    return;
-  }
+if (!['ADMIN', 'MANAGER'].includes(role)) {
+alert('You do not have permission to delete components.');
+return;
+}
 
-  try {
-    await api(`/api/inventory/${id}`, {
-      method: 'DELETE'
-    });
+try {
+const component = await api(`/api/inventory/${id}`);
 
-    await refresh();
 
-    alert('Component deleted successfully.');
-  } catch (error) {
-    alert(`Failed to delete component: ${error.message}`);
-  }
+pendingDeleteComponentId = component.id;
+deleteComponentName.textContent = component.name;
+deleteComponentSku.textContent = component.sku;
+deleteConfirmationError.textContent = '';
+
+deleteConfirmationDialog.showModal();
+
+
+} catch (error) {
+alert(`Unable to load component details: ${error.message}`);
+}
 };
+
+$('cancel-delete-component').addEventListener(
+'click',
+closeDeleteConfirmation
+);
+
+$('close-delete-confirmation').addEventListener(
+'click',
+closeDeleteConfirmation
+);
+
+deleteConfirmationDialog.addEventListener('click', event => {
+if (
+event.target === deleteConfirmationDialog &&
+!confirmDeleteButton.disabled
+) {
+closeDeleteConfirmation();
+}
+});
+
+deleteConfirmationDialog.addEventListener('cancel', event => {
+if (confirmDeleteButton.disabled) {
+event.preventDefault();
+}
+});
+
+confirmDeleteButton.addEventListener('click', async () => {
+const componentId = pendingDeleteComponentId;
+
+if (componentId === null || confirmDeleteButton.disabled) {
+return;
+}
+
+confirmDeleteButton.disabled = true;
+confirmDeleteButton.textContent = 'Deleting...';
+deleteConfirmationError.textContent = '';
+
+try {
+await api(`/api/inventory/${componentId}`, {
+method: 'DELETE'
+});
+
+
+pendingDeleteComponentId = null;
+deleteConfirmationDialog.close();
+
+await refresh();
+
+alert('Component deleted successfully.');
+
+
+} catch (error) {
+deleteConfirmationError.textContent =
+`Failed to delete component: ${error.message}`;
+} finally {
+confirmDeleteButton.disabled = false;
+confirmDeleteButton.textContent = 'Confirm Delete';
+}
+});
+
+
 
 // ==================== INITIALIZE APPLICATION ====================
 
