@@ -195,6 +195,10 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
     components = repositories.list_active_components(db)
     total_value = sum(c.quantity * c.unit_price for c in components)
     low_count = sum(stock_status(c) == "low-stock" for c in components)
+    low_stock_components = [
+        component for component in components
+        if stock_status(component) == "low-stock"
+    ]
     recent = sorted(components, key=lambda c: c.created_at, reverse=True)[:5]
     category_totals: dict[str, dict[str, int]] = {}
     trend_totals: dict[str, dict[str, int]] = {}
@@ -218,6 +222,10 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
         total_components=len(components),
         total_stock_value=round(total_value, 2),
         low_stock_count=low_count,
+        low_stock_components=[
+            component_response_data(component, user)
+            for component in low_stock_components
+        ],
         recently_added=[
             component_response_data(component, user)
             for component in recent

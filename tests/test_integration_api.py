@@ -557,6 +557,9 @@ def test_availability_and_dashboard(client, staff_token):
     assert dash["total_components"] == 3
     assert dash["total_stock_value"] == 13780.0
     assert dash["low_stock_count"] == 1
+    assert [item["name"] for item in dash["low_stock_components"]] == [
+        "ESP32 Dev Board"
+    ]
     assert len(dash["recently_added"]) == 3
     assert {item["name"] for item in dash["recently_added"]} == {
         "Arduino Uno",
@@ -568,6 +571,30 @@ def test_availability_and_dashboard(client, staff_token):
         {"category": "Passive", "quantity": 0, "component_count": 1},
     ]
     assert sum(point["quantity"] for point in dash["stock_trend"]) == 22
+
+
+def test_dashboard_low_stock_alert_data_updates_after_quantity_change(
+    client, admin_token, staff_token
+):
+    admin_headers = auth(admin_token)
+    staff_headers = auth(staff_token)
+
+    before = client.get("/api/dashboard", headers=staff_headers).json()
+    assert before["low_stock_count"] == 1
+
+    updated = client.patch(
+        "/api/inventory/1",
+        json={"quantity": 4},
+        headers=admin_headers,
+    )
+    assert updated.status_code == 200
+
+    after = client.get("/api/dashboard", headers=staff_headers).json()
+    assert after["low_stock_count"] == 2
+    assert {item["name"] for item in after["low_stock_components"]} == {
+        "Arduino Uno",
+        "ESP32 Dev Board",
+    }
 
 
 def test_deleted_sku_is_not_reused(client, admin_token):

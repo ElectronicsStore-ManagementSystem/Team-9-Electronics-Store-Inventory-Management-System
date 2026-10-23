@@ -13,6 +13,12 @@ Each recently added item is clickable and opens the same component details
 view as the inventory table. The dashboard and inventory list are refreshed
 together after an inventory change so the widgets remain current.
 
+When one or more components are at or below their reorder level, the dashboard
+shows an amber low-stock alert with the affected components, current and
+threshold quantities, and a shortcut to the low-stock inventory filter. The
+alert is recalculated on every dashboard refresh, so it appears immediately
+after the next refresh following a stock update.
+
 The dashboard also renders two charts:
 
 - **Stock by category**: a bar chart of current units grouped by category.

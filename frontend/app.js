@@ -107,6 +107,8 @@ $('logout').onclick = () => {
   $('recent-components-list').innerHTML = '';
   $('category-chart').innerHTML = '';
   $('trend-chart').innerHTML = '';
+  $('low-stock-alert').classList.add('hidden');
+  $('low-stock-alert-items').innerHTML = '';
   $('form-card').classList.add('hidden');
   $('add-feedback').classList.add('hidden');
   $('add-feedback').textContent = '';
@@ -146,6 +148,18 @@ $('recent-components-list').addEventListener('click', event => {
     showComponentDetails(componentButton.dataset.componentId);
   }
 });
+$('low-stock-alert-items').addEventListener('click', event => {
+  const componentButton = event.target.closest('[data-component-id]');
+  if (componentButton) {
+    showComponentDetails(componentButton.dataset.componentId);
+  }
+});
+$('view-low-stock').onclick = () => {
+  $('search').value = '';
+  $('status').value = 'low-stock';
+  refresh();
+  $('inventory').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
 $('component-details').addEventListener('click', event => {
   if (event.target.closest('[data-edit-component]') && currentComponent) {
     renderComponentEditForm(currentComponent);
@@ -395,6 +409,7 @@ async function refresh() {
           </button>
         `).join('')
       : '<p class="empty-state">No components have been added yet.</p>';
+    renderLowStockAlert(dashboard);
     renderBarChart(
       $('category-chart'),
       dashboard.category_stock || [],
@@ -424,6 +439,32 @@ async function refresh() {
         </tr>
       `;
       return;
+    }
+
+    function renderLowStockAlert(dashboard) {
+      const count = dashboard.low_stock_count || 0;
+      const components = dashboard.low_stock_components || [];
+      const alert = $('low-stock-alert');
+
+      if (!count) {
+        alert.classList.add('hidden');
+        return;
+      }
+
+      $('low-stock-alert-message').textContent =
+        `${count} ${count === 1 ? 'component is' : 'components are'} at or below the reorder level.`;
+      $('low-stock-alert-items').innerHTML = components.map(component => `
+        <button
+          class="low-stock-alert-item"
+          type="button"
+          data-component-id="${component.id}"
+          aria-label="View low-stock ${escapeHTML(component.name)}"
+        >
+          ${escapeHTML(component.name)}
+          <span>${component.quantity} / ${component.reorder_level} units</span>
+        </button>
+      `).join('');
+      alert.classList.remove('hidden');
     }
 
     function renderBarChart(container, points, label, value, kind) {
