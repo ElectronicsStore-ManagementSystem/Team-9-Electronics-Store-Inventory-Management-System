@@ -10,7 +10,9 @@ Send the login token in the `Authorization` header:
 Authorization: Bearer <access_token>
 ```
 
-`ADMIN` and `MANAGER` can add, update, and delete inventory components. `STAFF` can read inventory and reports but cannot perform those changes. Only `ADMIN` can sort by or see component creation dates. Unauthenticated requests to protected endpoints return `401`; authenticated users without permission receive `403`.
+`ADMIN` and `MANAGER` can add, update, and delete inventory components. `STAFF` can read inventory and reports but cannot perform those changes. Only `ADMIN` can sort by or see component creation dates. Unauthenticated requests to protected endpoints return `401` with a
+`WWW-Authenticate: Bearer` challenge. Invalid or expired tokens also return
+`401`; authenticated users without permission receive `403`.
 
 ## Endpoints
 

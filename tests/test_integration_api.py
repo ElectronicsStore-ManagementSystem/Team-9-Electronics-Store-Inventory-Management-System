@@ -12,6 +12,47 @@ def test_unauthenticated_inventory_is_rejected(client):
     assert r.status_code == 401
 
 
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/me",
+        "/api/inventory",
+        "/api/inventory/1",
+        "/api/reports/availability",
+        "/api/dashboard",
+        "/api/audit-logs",
+    ],
+)
+def test_all_protected_read_routes_require_authentication(client, path):
+    response = client.get(path)
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Authentication required"
+    assert response.headers["www-authenticate"] == "Bearer"
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/me",
+        "/api/inventory",
+        "/api/inventory/1",
+        "/api/reports/availability",
+        "/api/dashboard",
+        "/api/audit-logs",
+    ],
+)
+def test_all_protected_read_routes_reject_invalid_tokens(client, path):
+    response = client.get(
+        path,
+        headers={"Authorization": "Bearer not-a-valid-token"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid or expired token"
+    assert response.headers["www-authenticate"] == "Bearer"
+
+
 def test_seeded_user_passwords_are_salted_hashes_and_plaintext_is_rejected(
     client,
 ):
