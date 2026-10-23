@@ -5,8 +5,12 @@ __pycache__/
 *.db
 *.sqlite3
 .env
+.env.example
 .coverage
 htmlcov/
 .idea/
 .vscode/
 .DS_Store
+*.pdf
+*.doc
+*.docx
