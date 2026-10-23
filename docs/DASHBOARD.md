@@ -19,3 +19,12 @@ The dashboard also renders two charts:
 - **Stock added over time**: a bar chart grouped by the date components were
   added. This uses the available creation history; a separate stock-movement
   history is not stored by the current data model.
+
+## Role-based views
+
+Administrators and managers see the full dashboard and management controls.
+Staff users see the same read-only inventory summaries, charts, and details,
+but the interface labels their view as **Staff - Read-only view**, hides
+management actions, and directs them to a manager for changes. The API
+enforces the same restriction independently, so hiding a control is not the
+security boundary.

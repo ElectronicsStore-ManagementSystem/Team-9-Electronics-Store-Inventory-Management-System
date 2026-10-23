@@ -209,6 +209,16 @@ def test_staff_cannot_add_or_delete(client, staff_token):
     ).status_code == 403
 
 
+def test_staff_cannot_update_components(client, staff_token):
+    response = client.patch(
+        "/api/inventory/1",
+        json={"quantity": 1},
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 403
+
+
 def test_manager_can_add_component_and_find_it_afterward(client):
     from app.db import SessionLocal
     from app.models import User

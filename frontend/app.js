@@ -49,6 +49,13 @@ function setLoggedIn() {
     'hidden',
     !['ADMIN', 'MANAGER'].includes(role)
   );
+  const isStaff = role === 'STAFF';
+  $('dashboard-role').textContent = isStaff
+    ? 'Staff · Read-only view'
+    : `${role === 'ADMIN' ? 'Admin' : 'Manager'} · Full view`;
+  $('dashboard-description').textContent = isStaff
+    ? 'Review inventory, stock levels, and suppliers. Changes require a manager.'
+    : 'Track and manage components, stock levels, and suppliers.';
   $('quick-start-add-step').innerHTML = ['ADMIN', 'MANAGER'].includes(role)
     ? '<strong>Add it:</strong> choose <strong>Add component</strong> and complete the form.'
     : '<strong>Add it:</strong> ask a manager to add new stock; you can search and review components here.';
@@ -464,8 +471,8 @@ async function refresh() {
       }[stockStatus];
 
       const action = ['ADMIN', 'MANAGER'].includes(role)
-        ? `<button onclick="removeItem(${component.id})">Delete</button>`
-        : 'Read only';
+        ? `<button class="management-control" onclick="removeItem(${component.id})">Delete</button>`
+        : '<span class="read-only-label">Read only</span>';
 
       return `
         <tr class="stock-row-${stockStatus}">

@@ -72,9 +72,12 @@
           <div>
             <p class="eyebrow">INVENTORY MANAGEMENT</p>
             <h1>Inventory</h1>
-            <p>Track your components, stock levels, and suppliers.</p>
+            <p id="dashboard-description">Track your components, stock levels, and suppliers.</p>
           </div>
-          <span class="live-indicator"><span></span> Live inventory</span>
+          <div class="dashboard-view">
+            <span class="live-indicator"><span></span> Live inventory</span>
+            <span id="dashboard-role" class="dashboard-role" aria-live="polite"></span>
+          </div>
         </div>
 
         <div class="inventory-controls">
@@ -96,7 +99,7 @@
                 <span class="refresh-icon" aria-hidden="true">↻</span>
                 Refresh
               </button>
-              <button id="add-btn" class="hidden" type="button">
+              <button id="add-btn" class="hidden management-control" type="button">
                 <span aria-hidden="true">+</span> Add component
               </button>
             </div>
