@@ -3,6 +3,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from .bootstrap import initialize_database
@@ -11,9 +12,12 @@ from .models import AuditLog, Component, User
 from .schemas import ComponentCreate, ComponentResponse, ComponentUpdate, DashboardResponse, AvailabilityResponse, LoginRequest, LoginResponse
 from .security import create_access_token, get_current_user, require_manager, verify_password
 from .services import stock_status, validate_search
+from .config import ENFORCE_HTTPS
 from . import repositories
 
 app = FastAPI(title="EIMS API", version="1.0.0")
+if ENFORCE_HTTPS:
+    app.add_middleware(HTTPSRedirectMiddleware)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 app.mount("/static", StaticFiles(directory=FRONTEND), name="static")

@@ -42,10 +42,26 @@ python -m venv .venv
 # source .venv/bin/activate
 
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+EIMS_ENFORCE_HTTPS=false uvicorn app.main:app --reload
 ```
 
 Open `http://127.0.0.1:8000`.
+
+For HTTPS/TLS 1.2+ outside local development, provide a certificate and
+private key and start the dedicated TLS launcher:
+
+```bash
+# PowerShell
+$env:EIMS_TLS_CERTFILE = "C:\path\to\certificate.pem"
+$env:EIMS_TLS_KEYFILE = "C:\path\to\private-key.pem"
+python run_https.py
+```
+
+The application redirects HTTP requests to HTTPS by default. The HTTPS
+launcher explicitly rejects TLS versions below 1.2 and only enables TLS 1.2
+and TLS 1.3 ciphers. In deployments behind a reverse proxy, configure the
+proxy to redirect HTTP to HTTPS and forward only HTTPS traffic to the
+application.
 
 Demo accounts are created automatically on first startup:
 

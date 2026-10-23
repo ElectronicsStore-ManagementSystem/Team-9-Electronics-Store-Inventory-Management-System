@@ -1,6 +1,7 @@
 import os
 os.environ["EIMS_DATABASE_URL"] = "sqlite:///./test_eims.db"
 os.environ["EIMS_SECRET_KEY"] = "test-secret-key"
+os.environ["EIMS_ENFORCE_HTTPS"] = "false"
 import pytest
 from fastapi.testclient import TestClient
 from app.bootstrap import seed_demo_data
