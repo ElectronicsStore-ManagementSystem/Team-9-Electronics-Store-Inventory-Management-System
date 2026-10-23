@@ -39,7 +39,7 @@ Base path: `/api`
 | `category` | Exact category filter |
 | `supplier` | Exact supplier filter |
 | `status` | `in-stock`, `low-stock`, or `out-of-stock` |
-| `sort` | `id` (default), `quantity`, or `unit_price`; prefix with `-` for descending |
+| `sort` | `id` (default), `name`, `quantity`, or `unit_price`; prefix with `-` for descending |
 | `sort` (ADMIN only) | `date_added` or `date`; prefix with `-` for descending |
 
 For example, `GET /api/inventory?category=Microcontroller&status=low-stock&sort=-quantity` returns low-stock microcontrollers ordered by quantity descending.

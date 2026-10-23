@@ -33,6 +33,7 @@ def list_components(
     descending = sort.startswith("-")
     sort_field = sort[1:] if descending else sort
     sort_options = {
+        "name": func.lower(Component.name),
         "quantity": Component.quantity,
         "unit_price": Component.unit_price,
         "price": Component.unit_price,

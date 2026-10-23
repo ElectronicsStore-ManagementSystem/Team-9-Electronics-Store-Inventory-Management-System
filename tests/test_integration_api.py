@@ -659,6 +659,8 @@ def test_inventory_list_shows_all_required_fields_and_only_active_items(
 @pytest.mark.parametrize(
     ("sort", "expected_skus"),
     [
+        ("name", ["EIMS-00003", "EIMS-00001", "EIMS-00002"]),
+        ("-name", ["EIMS-00002", "EIMS-00001", "EIMS-00003"]),
         ("quantity", ["EIMS-00002", "EIMS-00003", "EIMS-00001"]),
         ("-quantity", ["EIMS-00001", "EIMS-00003", "EIMS-00002"]),
         ("unit_price", ["EIMS-00003", "EIMS-00002", "EIMS-00001"]),
