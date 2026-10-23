@@ -1,3 +1,8 @@
+from datetime import datetime
+
+import pytest
+
+
 def auth(token):
     return {"Authorization": f"Bearer {token}"}
 
@@ -14,6 +19,85 @@ def test_staff_can_read_inventory(client, staff_token):
     )
     assert r.status_code == 200
     assert len(r.json()) == 3
+
+
+def test_component_details_are_available_to_authenticated_users(
+    client, admin_token, staff_token
+):
+    admin_headers = auth(admin_token)
+    created = client.post(
+        "/api/inventory",
+        json={
+            "name": "Detail Test Component",
+            "category": "Test",
+            "quantity": 7,
+            "unit_price": 12.5,
+            "supplier": "Test Supplier",
+            "reorder_level": 2,
+        },
+        headers=admin_headers,
+    )
+    assert created.status_code == 201
+    component_id = created.json()["id"]
+
+    assert client.get(f"/api/inventory/{component_id}").status_code == 401
+
+    admin_response = client.get(
+        f"/api/inventory/{component_id}",
+        headers=admin_headers,
+    )
+    staff_response = client.get(
+        f"/api/inventory/{component_id}",
+        headers=auth(staff_token),
+    )
+
+    assert admin_response.status_code == 200
+    assert staff_response.status_code == 200
+    assert admin_response.json()["name"] == "Detail Test Component"
+    assert admin_response.json()["created_at"] == created.json()["created_at"]
+    assert staff_response.json()["created_at"] is None
+
+    staff_inventory = client.get(
+        "/api/inventory",
+        headers=auth(staff_token),
+    )
+    assert staff_inventory.status_code == 200
+    assert all(item["created_at"] is None for item in staff_inventory.json())
+
+    staff_dashboard = client.get(
+        "/api/dashboard",
+        headers=auth(staff_token),
+    )
+    assert staff_dashboard.status_code == 200
+    assert all(
+        item["created_at"] is None
+        for item in staff_dashboard.json()["recently_added"]
+    )
+
+    staff_availability = client.get(
+        "/api/reports/availability",
+        headers=auth(staff_token),
+    )
+    assert staff_availability.status_code == 200
+    assert all(
+        item["created_at"] is None
+        for item in staff_availability.json()
+    )
+
+    assert client.get(
+        "/api/inventory?sort=date_added",
+        headers=auth(staff_token),
+    ).status_code == 422
+
+    deleted = client.delete(
+        f"/api/inventory/{component_id}",
+        headers=admin_headers,
+    )
+    assert deleted.status_code == 200
+    assert client.get(
+        f"/api/inventory/{component_id}",
+        headers=admin_headers,
+    ).status_code == 404
 
 
 def test_staff_cannot_add_or_delete(client, staff_token):
@@ -268,6 +352,53 @@ def test_inventory_list_shows_all_required_fields_and_only_active_items(
     assert item["reorder_level"] == 5
 
     assert all(c["sku"] != "EIMS-99999" for c in items)
+
+
+@pytest.mark.parametrize(
+    ("sort", "expected_skus"),
+    [
+        ("quantity", ["EIMS-00002", "EIMS-00003", "EIMS-00001"]),
+        ("-quantity", ["EIMS-00001", "EIMS-00003", "EIMS-00002"]),
+        ("unit_price", ["EIMS-00003", "EIMS-00002", "EIMS-00001"]),
+        ("-unit_price", ["EIMS-00001", "EIMS-00002", "EIMS-00003"]),
+        ("date_added", ["EIMS-00002", "EIMS-00003", "EIMS-00001"]),
+        ("-date_added", ["EIMS-00001", "EIMS-00003", "EIMS-00002"]),
+    ],
+)
+def test_inventory_can_be_sorted_by_supported_fields(
+    client, admin_token, staff_token, sort, expected_skus
+):
+    from app.db import SessionLocal
+    from app.models import Component
+
+    db = SessionLocal()
+    try:
+        components = db.query(Component).order_by(Component.id).all()
+        sort_values = [
+            (30, 9.0, datetime(2024, 1, 1)),
+            (10, 5.0, datetime(2022, 1, 1)),
+            (20, 1.0, datetime(2023, 1, 1)),
+        ]
+
+        for component, (quantity, unit_price, created_at) in zip(
+            components, sort_values
+        ):
+            component.quantity = quantity
+            component.unit_price = unit_price
+            component.created_at = created_at
+
+        db.commit()
+    finally:
+        db.close()
+
+    token = admin_token if "date_added" in sort else staff_token
+    response = client.get(
+        f"/api/inventory?sort={sort}",
+        headers=auth(token),
+    )
+
+    assert response.status_code == 200
+    assert [item["sku"] for item in response.json()] == expected_skus
 
 
 # EIMS-F-002: Search Components
