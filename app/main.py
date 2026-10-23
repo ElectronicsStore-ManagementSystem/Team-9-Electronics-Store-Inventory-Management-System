@@ -58,23 +58,83 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 def me(user: User = Depends(get_current_user)):
     return {"id": user.id, "username": user.username, "role": user.role}
 
+
+def component_response_data(component: Component, user: User) -> dict:
+    data = ComponentResponse.model_validate(component).model_dump()
+    if user.role != "ADMIN":
+        data["created_at"] = None
+    return data
+
+
 @app.get("/api/inventory", response_model=list[ComponentResponse])
-def list_inventory(search: str | None = None, category: str | None = None, supplier: str | None = None, status: str | None = None, sort: str = Query(default="id"), db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    search, category, supplier = validate_search(search), validate_search(category), validate_search(supplier)
+def list_inventory(
+    search: str | None = None,
+    category: str | None = None,
+    supplier: str | None = None,
+    status: str | None = None,
+    sort: str = Query(default="id"),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    search = validate_search(search)
+    category = validate_search(category)
+    supplier = validate_search(supplier)
+
     query = select(Component).where(Component.active.is_(True))
+
     if search:
         term = f"%{search}%"
-        query = query.where(or_(Component.name.ilike(term), Component.sku.ilike(term), Component.category.ilike(term)))
-    if category: query = query.where(Component.category == category)
-    if supplier: query = query.where(Component.supplier == supplier)
+        query = query.where(
+            or_(
+                Component.name.ilike(term),
+                Component.sku.ilike(term),
+                Component.category.ilike(term),
+            )
+        )
+
+    if category:
+        query = query.where(Component.category == category)
+
+    if supplier:
+        query = query.where(Component.supplier == supplier)
+
+    descending = sort.startswith("-")
+    sort_field = sort[1:] if descending else sort
+
+    sort_options = {
+        "quantity": Component.quantity,
+        "unit_price": Component.unit_price,
+        "price": Component.unit_price,
+        "id": Component.id,
+    }
+    if user.role == "ADMIN":
+        sort_options.update({
+            "date_added": Component.created_at,
+            "date": Component.created_at,
+        })
+
+    sort_column = sort_options.get(sort_field)
+
+    if sort_column is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Unsupported inventory sort field",
+        )
+
+    query = query.order_by(
+        sort_column.desc() if descending else sort_column.asc(),
+        Component.id.asc(),
+    )
     components = list(db.scalars(query))
+
     if status:
-        components = [c for c in components if stock_status(c) == status]
-    if sort == "quantity": components.sort(key=lambda c: c.quantity)
-    elif sort == "price": components.sort(key=lambda c: c.unit_price)
-    elif sort == "date": components.sort(key=lambda c: c.created_at)
-    else: components.sort(key=lambda c: c.id)
-    return components
+        components = [
+            component for component in components
+            if stock_status(component) == status
+        ]
+
+    return [component_response_data(component, user) for component in components]
+
 
 @app.post("/api/inventory", response_model=ComponentResponse, status_code=201)
 def add_component(
@@ -120,6 +180,17 @@ def add_component(
             detail="The component could not be saved due to a database error.",
         ) from exc
 
+@app.get("/api/inventory/{component_id}", response_model=ComponentResponse)
+def get_component(
+    component_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    component = db.get(Component, component_id)
+    if not component or not component.active:
+        raise HTTPException(status_code=404, detail="Component not found")
+    return component_response_data(component, user)
+
 @app.patch("/api/inventory/{component_id}", response_model=ComponentResponse)
 def update_component(component_id: int, payload: ComponentUpdate, db: Session = Depends(get_db), user: User = Depends(require_manager)):
     component = db.get(Component, component_id)
@@ -144,7 +215,13 @@ def delete_component(component_id: int, db: Session = Depends(get_db), user: Use
 @app.get("/api/reports/availability", response_model=list[AvailabilityResponse])
 def availability(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     components = list(db.scalars(select(Component).where(Component.active.is_(True))))
-    return [{**ComponentResponse.model_validate(c).model_dump(), "status": stock_status(c)} for c in components]
+    return [
+        {
+            **component_response_data(component, user),
+            "status": stock_status(component),
+        }
+        for component in components
+    ]
 
 @app.get("/api/dashboard", response_model=DashboardResponse)
 def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
@@ -152,7 +229,15 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
     total_value = sum(c.quantity * c.unit_price for c in components)
     low_count = sum(stock_status(c) == "low-stock" for c in components)
     recent = sorted(components, key=lambda c: c.created_at, reverse=True)[:5]
-    return DashboardResponse(total_components=len(components), total_stock_value=round(total_value, 2), low_stock_count=low_count, recently_added=recent)
+    return DashboardResponse(
+        total_components=len(components),
+        total_stock_value=round(total_value, 2),
+        low_stock_count=low_count,
+        recently_added=[
+            component_response_data(component, user)
+            for component in recent
+        ],
+    )
 
 @app.get("/api/audit-logs")
 def audit_logs(db: Session = Depends(get_db), user: User = Depends(require_manager)):

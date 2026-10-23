@@ -45,7 +45,7 @@ class ComponentResponse(BaseModel):
     reorder_level: int
     image_url: str | None
     active: bool
-    created_at: datetime
+    created_at: datetime | None = None
 
 class AvailabilityResponse(ComponentResponse):
     status: str

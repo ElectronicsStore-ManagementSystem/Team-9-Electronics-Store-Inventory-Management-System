@@ -34,6 +34,13 @@ function setLoggedIn() {
   $('login-card').classList.toggle('hidden', !!token);
   $('app').classList.toggle('hidden', !token);
   $('logout').classList.toggle('hidden', !token);
+  const dateSortOption = $('sort-by').querySelector('[data-admin-only]');
+  dateSortOption.hidden = role !== 'ADMIN';
+  dateSortOption.disabled = role !== 'ADMIN';
+
+  if (role !== 'ADMIN' && $('sort-by').value === 'date_added') {
+    $('sort-by').value = 'id';
+  }
 
   $('add-btn').classList.toggle(
     'hidden',
@@ -96,6 +103,29 @@ $('search').oninput = refresh;
 $('category').onchange = refresh;
 $('supplier').onchange = refresh;
 $('status').onchange = refresh;
+$('sort-by').onchange = refresh;
+$('sort-order').onchange = refresh;
+$('inventory').addEventListener('click', event => {
+  const componentButton = event.target.closest('[data-component-id]');
+  if (componentButton) {
+    showComponentDetails(componentButton.dataset.componentId);
+  }
+});
+$('close-component-dialog').onclick = () => $('component-dialog').close();
+$('component-dialog').addEventListener('click', event => {
+  if (event.target === $('component-dialog')) {
+    $('component-dialog').close();
+  }
+});
+$('clear-filters').onclick = () => {
+  $('search').value = '';
+  $('category').value = '';
+  $('supplier').value = '';
+  $('status').value = '';
+  $('sort-by').value = 'id';
+  $('sort-order').value = 'asc';
+  refresh();
+};
 
 // ==================== ADD COMPONENT FORM ====================
 
@@ -179,6 +209,15 @@ async function refresh() {
       query.set('status', statusFilter);
     }
 
+    // Sort inventory
+    const sortBy = $('sort-by').value;
+    const sortOrder = $('sort-order').value;
+
+    query.set(
+      'sort',
+      sortOrder === 'desc' ? `-${sortBy}` : sortBy
+    );
+
     // Send all selected filters in one request
     const [items, dashboard] = await Promise.all([
       api('/api/inventory?' + query.toString()),
@@ -188,20 +227,32 @@ async function refresh() {
     // Dashboard statistics
     $('stats').innerHTML = `
       <div class="stat">
-        Total components
-        <b>${dashboard.total_components}</b>
+        <span class="stat-icon" aria-hidden="true">#</span>
+        <span class="stat-copy">
+          <span class="stat-label">Total components</span>
+          <b>${dashboard.total_components}</b>
+        </span>
       </div>
 
       <div class="stat">
-        Stock value
-        <b>₹${Number(dashboard.total_stock_value).toFixed(2)}</b>
+        <span class="stat-icon" aria-hidden="true">₹</span>
+        <span class="stat-copy">
+          <span class="stat-label">Stock value</span>
+          <b>₹${Number(dashboard.total_stock_value).toFixed(2)}</b>
+        </span>
       </div>
 
       <div class="stat">
-        Low stock
-        <b>${dashboard.low_stock_count}</b>
+        <span class="stat-icon" aria-hidden="true">!</span>
+        <span class="stat-copy">
+          <span class="stat-label">Low stock items</span>
+          <b>${dashboard.low_stock_count}</b>
+        </span>
       </div>
     `;
+
+    $('results-count').textContent =
+      `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
 
     // Handle empty results
     if (!items.length) {
@@ -225,6 +276,12 @@ async function refresh() {
             ? 'low-stock'
             : 'in-stock';
 
+      const statusLabel = {
+        'in-stock': 'In stock',
+        'low-stock': 'Low stock',
+        'out-of-stock': 'Out of stock'
+      }[stockStatus];
+
       const action = ['ADMIN', 'MANAGER'].includes(role)
         ? `<button onclick="removeItem(${component.id})">Delete</button>`
         : 'Read only';
@@ -232,13 +289,20 @@ async function refresh() {
       return `
         <tr>
           <td>${escapeHTML(component.sku)}</td>
-          <td>${escapeHTML(component.name)}</td>
+          <td>
+            <button
+              class="component-link"
+              type="button"
+              data-component-id="${component.id}"
+              aria-label="View details for ${escapeHTML(component.name)}"
+            >${escapeHTML(component.name)}</button>
+          </td>
           <td>${escapeHTML(component.category)}</td>
           <td>${component.quantity}</td>
           <td>₹${Number(component.unit_price).toFixed(2)}</td>
           <td>${escapeHTML(component.supplier)}</td>
           <td>${component.reorder_level}</td>
-          <td class="status">${stockStatus}</td>
+          <td><span class="status-badge status-${stockStatus}">${statusLabel}</span></td>
           <td>${action}</td>
         </tr>
       `;
@@ -271,6 +335,79 @@ async function refresh() {
           Unable to load inventory. Please try refreshing.
         </td>
       </tr>
+    `;
+  }
+}
+
+async function showComponentDetails(componentId) {
+  const dialog = $('component-dialog');
+  const details = $('component-details');
+  details.innerHTML = '<p class="details-message">Loading component details...</p>';
+  dialog.showModal();
+
+  try {
+    const component = await api(`/api/inventory/${componentId}`);
+    const stockStatus = component.quantity === 0
+      ? 'out-of-stock'
+      : component.quantity <= component.reorder_level
+        ? 'low-stock'
+        : 'in-stock';
+    const statusLabel = {
+      'in-stock': 'In stock',
+      'low-stock': 'Low stock',
+      'out-of-stock': 'Out of stock'
+    }[stockStatus];
+    const dateAdded = role === 'ADMIN' && component.created_at
+      ? `
+        <div class="detail-item">
+          <dt>Date added</dt>
+          <dd>${escapeHTML(new Intl.DateTimeFormat(undefined, {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+          }).format(new Date(component.created_at)))}</dd>
+        </div>
+      `
+      : '';
+    details.innerHTML = `
+      <p class="component-detail-category">${escapeHTML(component.category)}</p>
+      <dl class="details-grid">
+        <div class="detail-item detail-name">
+          <dt>Component</dt>
+          <dd>${escapeHTML(component.name)}</dd>
+        </div>
+        <div class="detail-item">
+          <dt>SKU</dt>
+          <dd>${escapeHTML(component.sku)}</dd>
+        </div>
+        <div class="detail-item">
+          <dt>Stock status</dt>
+          <dd><span class="status-badge status-${stockStatus}">${statusLabel}</span></dd>
+        </div>
+        <div class="detail-item">
+          <dt>Quantity in stock</dt>
+          <dd>${component.quantity}</dd>
+        </div>
+        <div class="detail-item">
+          <dt>Unit price</dt>
+          <dd>₹${Number(component.unit_price).toFixed(2)}</dd>
+        </div>
+        <div class="detail-item">
+          <dt>Supplier</dt>
+          <dd>${escapeHTML(component.supplier)}</dd>
+        </div>
+        <div class="detail-item">
+          <dt>Reorder level</dt>
+          <dd>${component.reorder_level}</dd>
+        </div>
+        ${dateAdded}
+      </dl>
+    `;
+  } catch (error) {
+    console.error('Failed to load component details:', error);
+    details.innerHTML = `
+      <p class="details-error" role="alert">
+        Unable to load component details. ${escapeHTML(error.message)}
+      </p>
     `;
   }
 }
