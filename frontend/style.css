@@ -181,6 +181,63 @@ h2 {
   padding: 24px;
 }
 
+.quick-start {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) 1.2fr;
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 22px;
+  padding: 18px 20px;
+  color: #334155;
+  background: #f3f6ff;
+  border: 1px solid #dce5ff;
+  border-radius: var(--radius);
+}
+
+.quick-start h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.quick-start p:last-child {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.quick-start ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 22px;
+  font-size: 13px;
+}
+
+.quick-start li::marker {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.field-help {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 #login-card {
   width: min(100%, 440px);
   margin: 70px auto;
@@ -906,6 +963,11 @@ button.hidden {
 
   .inventory-controls {
     padding: 12px;
+  }
+
+  .quick-start {
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .search-row {

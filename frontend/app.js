@@ -49,6 +49,9 @@ function setLoggedIn() {
     'hidden',
     !['ADMIN', 'MANAGER'].includes(role)
   );
+  $('quick-start-add-step').innerHTML = ['ADMIN', 'MANAGER'].includes(role)
+    ? '<strong>Add it:</strong> choose <strong>Add component</strong> and complete the form.'
+    : '<strong>Add it:</strong> ask a manager to add new stock; you can search and review components here.';
 
   if (token) {
     refresh();
@@ -104,7 +107,18 @@ $('logout').onclick = () => {
 // ==================== INVENTORY CONTROLS ====================
 
 $('refresh').onclick = refresh;
-$('search').oninput = refresh;
+let searchTimer;
+$('search').oninput = () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(refresh, 300);
+};
+$('search').onkeydown = event => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    clearTimeout(searchTimer);
+    refresh();
+  }
+};
 $('category').onchange = refresh;
 $('supplier').onchange = refresh;
 $('status').onchange = refresh;
@@ -185,6 +199,7 @@ $('add-btn').onclick = () => {
   $('add-feedback').textContent = '';
   $('form-card').classList.remove('hidden');
   $('form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('component-form').elements.namedItem('name').focus();
 };
 
 $('cancel-add').onclick = () => {

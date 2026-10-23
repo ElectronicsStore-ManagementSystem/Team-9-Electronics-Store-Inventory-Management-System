@@ -86,7 +86,9 @@
                 type="search"
                 placeholder="Search by name, SKU, or category"
                 aria-label="Search inventory"
+                aria-describedby="search-help"
               >
+              <span id="search-help" class="sr-only">Results update as you type. Press Enter to search now.</span>
             </label>
 
             <div class="search-actions">
@@ -164,6 +166,19 @@
         </div>
       </section>
 
+      <aside class="quick-start" aria-labelledby="quick-start-title">
+        <div>
+          <p class="eyebrow">QUICK START</p>
+          <h2 id="quick-start-title">New to the inventory workspace?</h2>
+          <p>Search, review, or add a component in three simple steps.</p>
+        </div>
+        <ol>
+          <li><strong>Find it:</strong> type a name, SKU, or category above.</li>
+          <li><strong>Review it:</strong> select a component name to see details.</li>
+          <li id="quick-start-add-step"><strong>Add it:</strong> choose <strong>Add component</strong> and complete the form.</li>
+        </ol>
+      </aside>
+
       <!-- Dashboard statistics -->
       <section id="stats" class="stats" aria-label="Inventory statistics">
       </section>
@@ -239,8 +254,10 @@
               name="name"
               type="text"
               placeholder="Enter component name"
+              aria-describedby="name-help"
               required
             >
+            <small id="name-help" class="field-help">Use the name printed on the component or packaging.</small>
           </label>
 
           <label>
@@ -249,8 +266,10 @@
               name="category"
               type="text"
               placeholder="Enter category"
+              aria-describedby="category-help"
               required
             >
+            <small id="category-help" class="field-help">For example: Microcontroller, Sensor, or Display.</small>
           </label>
 
           <label>
@@ -260,8 +279,10 @@
               type="number"
               min="0"
               placeholder="Enter quantity"
+              aria-describedby="quantity-help"
               required
             >
+            <small id="quantity-help" class="field-help">Enter the number of units currently available.</small>
           </label>
 
           <label>
@@ -272,8 +293,10 @@
               min="0"
               step="0.01"
               placeholder="Enter unit price"
+              aria-describedby="price-help"
               required
             >
+            <small id="price-help" class="field-help">Enter the price for one unit.</small>
           </label>
 
           <label>
@@ -282,8 +305,10 @@
               name="supplier"
               type="text"
               placeholder="Enter supplier name"
+              aria-describedby="supplier-help"
               required
             >
+            <small id="supplier-help" class="field-help">Use the supplier's business name.</small>
           </label>
 
           <label>
@@ -293,7 +318,9 @@
               type="number"
               min="0"
               value="5"
+              aria-describedby="reorder-help"
             >
+            <small id="reorder-help" class="field-help">We will flag stock at or below this number. Default: 5.</small>
           </label>
 
           <div class="form-actions">
@@ -302,7 +329,7 @@
 
         </form>
 
-        <p id="form-error" class="error" role="alert"></p>
+        <p id="form-error" class="error" role="alert" aria-live="assertive"></p>
       </section>
 
     </section>
