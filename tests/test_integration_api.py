@@ -121,6 +121,108 @@ def test_availability_and_dashboard(client, staff_token):
     assert dash["low_stock_count"] == 1
 
 
+def test_deleted_sku_is_not_reused(client, admin_token):
+    headers = auth(admin_token)
+
+    payload = {
+        "name": "Temporary Component",
+        "category": "Test",
+        "quantity": 2,
+        "unit_price": 100,
+        "supplier": "Test Supplier",
+        "reorder_level": 1,
+    }
+
+    first = client.post(
+        "/api/inventory",
+        json=payload,
+        headers=headers,
+    )
+
+    assert first.status_code == 201
+    first_sku = first.json()["sku"]
+
+    deleted = client.delete(
+        f"/api/inventory/{first.json()['id']}",
+        headers=headers,
+    )
+    assert deleted.status_code == 200
+
+    second = client.post(
+        "/api/inventory",
+        json=payload,
+        headers=headers,
+    )
+
+    assert second.status_code == 201
+    assert second.json()["sku"] != first_sku
+
+
+def test_sku_is_preserved_after_component_update(client, admin_token):
+    headers = auth(admin_token)
+
+    payload = {
+        "name": "Update Test Component",
+        "category": "Test",
+        "quantity": 5,
+        "unit_price": 50,
+        "supplier": "Test Supplier",
+        "reorder_level": 2,
+    }
+
+    created = client.post(
+        "/api/inventory",
+        json=payload,
+        headers=headers,
+    )
+
+    assert created.status_code == 201
+    original_sku = created.json()["sku"]
+
+    updated = client.patch(
+        f"/api/inventory/{created.json()['id']}",
+        json={"quantity": 10},
+        headers=headers,
+    )
+
+    assert updated.status_code == 200
+    assert updated.json()["sku"] == original_sku
+    assert updated.json()["quantity"] == 10
+
+
+def test_sku_is_returned_in_inventory_list(client, admin_token):
+    headers = auth(admin_token)
+
+    payload = {
+        "name": "List Test Component",
+        "category": "Test",
+        "quantity": 3,
+        "unit_price": 25,
+        "supplier": "Test Supplier",
+        "reorder_level": 1,
+    }
+
+    created = client.post(
+        "/api/inventory",
+        json=payload,
+        headers=headers,
+    )
+
+    assert created.status_code == 201
+    created_sku = created.json()["sku"]
+
+    inventory = client.get(
+        "/api/inventory",
+        headers=headers,
+    )
+
+    assert inventory.status_code == 200
+    assert any(
+        item["sku"] == created_sku
+        for item in inventory.json()
+    )
+
+
 def test_inventory_list_shows_all_required_fields_and_only_active_items(
     client, staff_token
 ):
@@ -153,7 +255,6 @@ def test_inventory_list_shows_all_required_fields_and_only_active_items(
     assert response.status_code == 200
     items = response.json()
 
-    # The three seeded active components should remain visible.
     assert len(items) == 3
 
     item = next(c for c in items if c["sku"] == "EIMS-00001")
@@ -166,12 +267,10 @@ def test_inventory_list_shows_all_required_fields_and_only_active_items(
     assert item["supplier"] == "TechSource"
     assert item["reorder_level"] == 5
 
-    # Inactive components must not appear.
     assert all(c["sku"] != "EIMS-99999" for c in items)
 
 
 # EIMS-F-002: Search Components
-
 
 def test_search_inventory_by_component_name(client, staff_token):
     response = client.get(
@@ -225,3 +324,4 @@ def test_search_inventory_with_no_matches(client, staff_token):
 
     assert response.status_code == 200
     assert response.json() == []
+

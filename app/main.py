@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from .db import Base, engine, get_db, SessionLocal
 from .models import AuditLog, Component, User
@@ -76,13 +77,48 @@ def list_inventory(search: str | None = None, category: str | None = None, suppl
     return components
 
 @app.post("/api/inventory", response_model=ComponentResponse, status_code=201)
-def add_component(payload: ComponentCreate, db: Session = Depends(get_db), user: User = Depends(require_manager)):
-    sku = next_sku(db)
-    component = Component(sku=sku, **payload.model_dump())
-    db.add(component)
-    db.commit()
-    db.refresh(component)
-    return component
+def add_component(
+    payload: ComponentCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_manager),
+):
+    try:
+        sku = next_sku(db)
+
+        if not sku or not sku.startswith("EIMS-"):
+            raise HTTPException(
+                status_code=500,
+                detail="Unable to generate a valid component SKU.",
+            )
+
+        component = Component(
+            sku=sku,
+            **payload.model_dump(),
+        )
+
+        db.add(component)
+        db.commit()
+        db.refresh(component)
+
+        return component
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="The component could not be saved because of a duplicate or conflicting identifier. Please try again.",
+        ) from exc
+
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="The component could not be saved due to a database error.",
+        ) from exc
 
 @app.patch("/api/inventory/{component_id}", response_model=ComponentResponse)
 def update_component(component_id: int, payload: ComponentUpdate, db: Session = Depends(get_db), user: User = Depends(require_manager)):
