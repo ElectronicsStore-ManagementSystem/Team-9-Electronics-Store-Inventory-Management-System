@@ -22,11 +22,21 @@ async function api(path, options = {}) {
       // Response was not JSON.
     }
 
-    throw new Error(data.detail || `HTTP ${response.status}`);
+    const error = new Error(
+      typeof data.detail === 'string'
+        ? data.detail
+        : `Request failed with status ${response.status}`
+    );
+
+    error.status = response.status;
+    error.details = Array.isArray(data.detail) ? data.detail : [];
+
+    throw error;
   }
 
   return response.json();
 }
+
 
 // ==================== LOGIN / LOGOUT ====================
 
@@ -97,6 +107,103 @@ $('category').onchange = refresh;
 $('supplier').onchange = refresh;
 $('status').onchange = refresh;
 
+const componentFields = [
+  'name',
+  'category',
+  'quantity',
+  'unit_price',
+  'supplier',
+  'reorder_level'
+];
+
+const fieldLabels = {
+  name: 'Component name',
+  category: 'Category',
+  quantity: 'Quantity',
+  unit_price: 'Unit price',
+  supplier: 'Supplier',
+  reorder_level: 'Reorder level'
+};
+
+function clearFieldErrors() {
+  componentFields.forEach(name => {
+    const input = document.querySelector(
+      `#component-form [name="${name}"]`
+    );
+
+    const error = $(`${name}-error`);
+
+    if (input) {
+      input.classList.remove('invalid-field');
+      input.removeAttribute('aria-invalid');
+      input.setCustomValidity('');
+    }
+
+    if (error) {
+      error.textContent = '';
+    }
+  });
+
+  $('form-error').textContent = '';
+}
+
+function showFieldError(name, message) {
+  const input = document.querySelector(
+    `#component-form [name="${name}"]`
+  );
+
+  const error = $(`${name}-error`);
+
+  if (input) {
+    input.classList.add('invalid-field');
+    input.setAttribute('aria-invalid', 'true');
+    input.setCustomValidity(message);
+  }
+
+  if (error) {
+    error.textContent = message;
+  }
+}
+
+function displayValidationErrors(details) {
+  let displayedFieldError = false;
+
+  details.forEach(detail => {
+    const location = detail.loc || [];
+    const fieldName = location[location.length - 1];
+
+    if (!componentFields.includes(fieldName)) {
+      return;
+    }
+
+    const messages = {
+      missing: `${fieldLabels[fieldName]} is required.`,
+      string_too_short: `${fieldLabels[fieldName]} cannot be empty.`,
+      greater_than_equal:
+        `${fieldLabels[fieldName]} must be zero or greater.`,
+      int_parsing: `${fieldLabels[fieldName]} must be a whole number.`,
+      float_parsing: `${fieldLabels[fieldName]} must be a valid number.`,
+      int_type: `${fieldLabels[fieldName]} must be a whole number.`,
+      float_type: `${fieldLabels[fieldName]} must be a valid number.`
+    };
+
+    showFieldError(
+      fieldName,
+      messages[detail.type] || detail.msg || 'Please check this field.'
+    );
+
+    displayedFieldError = true;
+  });
+
+  if (!displayedFieldError) {
+    $('form-error').textContent =
+      'Please check the component details and try again.';
+  } else {
+    $('form-error').textContent =
+      'Please correct the highlighted fields and try again.';
+  }
+}
+
 // ==================== ADD COMPONENT FORM ====================
 
 $('add-btn').onclick = () => {
@@ -109,17 +216,80 @@ $('cancel-add').onclick = () => {
 };
 
 // Add component
+// Add component
 $('component-form').onsubmit = async event => {
   event.preventDefault();
-  $('form-error').textContent = '';
+
+  clearFieldErrors();
+
+  const form = event.target;
+
+  // Run native browser validation first.
+  if (!form.reportValidity()) {
+    return;
+  }
 
   const data = Object.fromEntries(
-    new FormData(event.target).entries()
+    new FormData(form).entries()
   );
 
+  data.name = data.name.trim();
+  data.category = data.category.trim();
+  data.supplier = data.supplier.trim();
   data.quantity = Number(data.quantity);
   data.unit_price = Number(data.unit_price);
   data.reorder_level = Number(data.reorder_level);
+
+  // Validate text fields before making an API request.
+  let hasErrors = false;
+
+  ['name', 'category', 'supplier'].forEach(name => {
+    if (!data[name]) {
+      showFieldError(
+        name,
+        `${fieldLabels[name]} is required.`
+      );
+
+      hasErrors = true;
+    }
+  });
+
+  if (!Number.isInteger(data.quantity) || data.quantity < 0) {
+    showFieldError(
+      'quantity',
+      'Quantity must be a whole number greater than or equal to 0.'
+    );
+
+    hasErrors = true;
+  }
+
+  if (!Number.isFinite(data.unit_price) || data.unit_price < 0) {
+    showFieldError(
+      'unit_price',
+      'Unit price must be a valid number greater than or equal to 0.'
+    );
+
+    hasErrors = true;
+  }
+
+  if (
+    !Number.isInteger(data.reorder_level) ||
+    data.reorder_level < 0
+  ) {
+    showFieldError(
+      'reorder_level',
+      'Reorder level must be a whole number greater than or equal to 0.'
+    );
+
+    hasErrors = true;
+  }
+
+  if (hasErrors) {
+    $('form-error').textContent =
+      'Please correct the highlighted fields and try again.';
+
+    return;
+  }
 
   try {
     await api('/api/inventory', {
@@ -128,12 +298,19 @@ $('component-form').onsubmit = async event => {
       body: JSON.stringify(data)
     });
 
-    event.target.reset();
+    form.reset();
+    clearFieldErrors();
+
     $('form-card').classList.add('hidden');
 
     await refresh();
   } catch (error) {
-    $('form-error').textContent = error.message;
+    if (error.status === 422) {
+      displayValidationErrors(error.details);
+    } else {
+      $('form-error').textContent =
+        error.message || 'Unable to save the component. Please try again.';
+    }
   }
 };
 
