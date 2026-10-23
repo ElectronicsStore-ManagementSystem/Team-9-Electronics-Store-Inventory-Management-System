@@ -11,20 +11,51 @@ from .db import get_db
 from .models import User
 
 ALGORITHM = "HS256"
+PASSWORD_HASH_SCHEME = "pbkdf2_sha256"
+PASSWORD_HASH_ITERATIONS = 310_000
+PASSWORD_SALT_BYTES = 16
+PASSWORD_DIGEST_BYTES = 32
 bearer = HTTPBearer(auto_error=False)
 
 def hash_password(password: str) -> str:
-    salt = secrets.token_bytes(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 310_000)
-    return f"pbkdf2_sha256$310000${salt.hex()}${digest.hex()}"
+    salt = secrets.token_bytes(PASSWORD_SALT_BYTES)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode(),
+        salt,
+        PASSWORD_HASH_ITERATIONS,
+    )
+    return (
+        f"{PASSWORD_HASH_SCHEME}${PASSWORD_HASH_ITERATIONS}"
+        f"${salt.hex()}${digest.hex()}"
+    )
 
 def verify_password(password: str, encoded: str) -> bool:
+    if not isinstance(encoded, str):
+        return False
+
     try:
         scheme, rounds, salt_hex, digest_hex = encoded.split("$")
-        if scheme != "pbkdf2_sha256":
+        if scheme != PASSWORD_HASH_SCHEME:
             return False
-        candidate = hashlib.pbkdf2_hmac("sha256", password.encode(), bytes.fromhex(salt_hex), int(rounds))
-        return hmac.compare_digest(candidate.hex(), digest_hex)
+        if int(rounds) != PASSWORD_HASH_ITERATIONS:
+            return False
+
+        salt = bytes.fromhex(salt_hex)
+        expected_digest = bytes.fromhex(digest_hex)
+        if (
+            len(salt) != PASSWORD_SALT_BYTES
+            or len(expected_digest) != PASSWORD_DIGEST_BYTES
+        ):
+            return False
+
+        candidate = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode(),
+            salt,
+            PASSWORD_HASH_ITERATIONS,
+        )
+        return hmac.compare_digest(candidate, expected_digest)
     except (ValueError, TypeError):
         return False
 
