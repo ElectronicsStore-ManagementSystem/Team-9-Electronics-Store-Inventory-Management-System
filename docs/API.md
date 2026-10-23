@@ -55,6 +55,9 @@ The frontend highlights low-stock rows with an amber indicator and
 highlight is recalculated whenever inventory is refreshed, including after a
 quantity or reorder-level update.
 
+The dashboard displays total component count, total stock value, low-stock
+count, and a clickable list of the five most recently added active components.
+
 ## Component payloads
 
 Component creation requires `name`, `category`, `quantity`, `unit_price`, and `supplier`. `reorder_level` is optional and defaults to `5`; `image_url` is optional. Text fields are trimmed and cannot be blank. Quantity, unit price, and reorder level must be nonnegative; unit price must be finite.

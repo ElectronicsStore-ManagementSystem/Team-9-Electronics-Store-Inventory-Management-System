@@ -545,7 +545,14 @@ def test_availability_and_dashboard(client, staff_token):
 
     dash = client.get("/api/dashboard", headers=h).json()
     assert dash["total_components"] == 3
+    assert dash["total_stock_value"] == 13780.0
     assert dash["low_stock_count"] == 1
+    assert len(dash["recently_added"]) == 3
+    assert {item["name"] for item in dash["recently_added"]} == {
+        "Arduino Uno",
+        "ESP32 Dev Board",
+        "220 Ohm Resistor",
+    }
 
 
 def test_deleted_sku_is_not_reused(client, admin_token):

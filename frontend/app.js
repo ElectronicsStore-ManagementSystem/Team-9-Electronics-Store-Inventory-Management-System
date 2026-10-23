@@ -97,6 +97,7 @@ $('logout').onclick = () => {
   $('login-error').textContent = '';
   $('inventory').innerHTML = '';
   $('stats').innerHTML = '';
+  $('recent-components-list').innerHTML = '';
   $('form-card').classList.add('hidden');
   $('add-feedback').classList.add('hidden');
   $('add-feedback').textContent = '';
@@ -125,6 +126,12 @@ $('status').onchange = refresh;
 $('sort-by').onchange = refresh;
 $('sort-order').onchange = refresh;
 $('inventory').addEventListener('click', event => {
+  const componentButton = event.target.closest('[data-component-id]');
+  if (componentButton) {
+    showComponentDetails(componentButton.dataset.componentId);
+  }
+});
+$('recent-components-list').addEventListener('click', event => {
   const componentButton = event.target.closest('[data-component-id]');
   if (componentButton) {
     showComponentDetails(componentButton.dataset.componentId);
@@ -362,6 +369,23 @@ async function refresh() {
         </span>
       </div>
     `;
+
+    const recentComponents = dashboard.recently_added || [];
+    $('recent-components-list').innerHTML = recentComponents.length
+      ? recentComponents.map(component => `
+          <button
+            class="recent-component"
+            type="button"
+            data-component-id="${component.id}"
+            aria-label="View recently added ${escapeHTML(component.name)}"
+          >
+            <span class="recent-component-name">${escapeHTML(component.name)}</span>
+            <span class="recent-component-meta">
+              ${escapeHTML(component.category)} · ${escapeHTML(component.sku)}
+            </span>
+          </button>
+        `).join('')
+      : '<p class="empty-state">No components have been added yet.</p>';
 
     $('results-count').textContent =
       `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
