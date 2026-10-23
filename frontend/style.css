@@ -624,6 +624,32 @@ tbody tr:last-child td {
   border-bottom: none;
 }
 
+tbody tr.stock-row-low-stock {
+  background: #fffaf0;
+  box-shadow: inset 4px 0 0 #e3a52f;
+}
+
+tbody tr.stock-row-low-stock:hover {
+  background: #fff4dc;
+}
+
+tbody tr.stock-row-out-of-stock {
+  background: #fff6f5;
+  box-shadow: inset 4px 0 0 #d96963;
+}
+
+.quantity-cell {
+  white-space: nowrap;
+}
+
+.stock-alert {
+  display: block;
+  margin-top: 2px;
+  color: #a96c0b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 td:first-child {
   color: #526998;
   font-family: 'Space Grotesk', sans-serif;

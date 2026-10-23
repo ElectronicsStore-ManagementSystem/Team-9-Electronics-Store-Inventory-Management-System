@@ -399,7 +399,7 @@ async function refresh() {
         : 'Read only';
 
       return `
-        <tr>
+        <tr class="stock-row-${stockStatus}">
           <td>${escapeHTML(component.sku)}</td>
           <td>
             <button
@@ -410,7 +410,12 @@ async function refresh() {
             >${escapeHTML(component.name)}</button>
           </td>
           <td>${escapeHTML(component.category)}</td>
-          <td>${component.quantity}</td>
+          <td class="quantity-cell">
+            <span>${component.quantity}</span>
+            ${stockStatus === 'low-stock'
+              ? '<span class="stock-alert">Needs reorder</span>'
+              : ''}
+          </td>
           <td>₹${Number(component.unit_price).toFixed(2)}</td>
           <td>${escapeHTML(component.supplier)}</td>
           <td>${component.reorder_level}</td>

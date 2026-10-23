@@ -50,6 +50,11 @@ For example, `GET /api/inventory?category=Microcontroller&status=low-stock&sort=
 
 Staff requests to sort by creation date are rejected with `422`.
 
+The frontend highlights low-stock rows with an amber indicator and
+`Needs reorder` label. Out-of-stock rows use a separate red indicator. The
+highlight is recalculated whenever inventory is refreshed, including after a
+quantity or reorder-level update.
+
 ## Component payloads
 
 Component creation requires `name`, `category`, `quantity`, `unit_price`, and `supplier`. `reorder_level` is optional and defaults to `5`; `image_url` is optional. Text fields are trimmed and cannot be blank. Quantity, unit price, and reorder level must be nonnegative; unit price must be finite.
