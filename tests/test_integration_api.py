@@ -124,6 +124,139 @@ def test_staff_cannot_add_or_delete(client, staff_token):
     ).status_code == 403
 
 
+def test_authorized_manager_can_update_all_editable_component_fields(
+    client, admin_token
+):
+    from app.db import SessionLocal
+    from app.models import User
+    from app.security import hash_password
+
+    headers = auth(admin_token)
+    created = client.post(
+        "/api/inventory",
+        json={
+            "name": "Editable Component",
+            "category": "Test",
+            "quantity": 3,
+            "unit_price": 8.5,
+            "supplier": "Old Supplier",
+            "reorder_level": 1,
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201
+    component_id = created.json()["id"]
+
+    db = SessionLocal()
+    try:
+        db.add(
+            User(
+                username="inventory_manager",
+                password_hash=hash_password("Manager@12345"),
+                role="MANAGER",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    manager_login = client.post(
+        "/api/auth/login",
+        json={"username": "inventory_manager", "password": "Manager@12345"},
+    )
+    assert manager_login.status_code == 200
+    manager_headers = auth(manager_login.json()["access_token"])
+
+    updated = client.patch(
+        f"/api/inventory/{component_id}",
+        json={
+            "quantity": 12,
+            "unit_price": 14.75,
+            "supplier": "  New Supplier  ",
+            "reorder_level": 4,
+        },
+        headers=manager_headers,
+    )
+
+    assert updated.status_code == 200
+    assert {
+        key: updated.json()[key]
+        for key in ("quantity", "unit_price", "supplier", "reorder_level")
+    } == {
+        "quantity": 12,
+        "unit_price": 14.75,
+        "supplier": "New Supplier",
+        "reorder_level": 4,
+    }
+
+    reopened = client.get(
+        f"/api/inventory/{component_id}",
+        headers=manager_headers,
+    )
+    listed = client.get("/api/inventory", headers=manager_headers)
+    persisted_item = next(
+        item for item in listed.json()
+        if item["id"] == component_id
+    )
+    for item in (reopened.json(), persisted_item):
+        assert item["quantity"] == 12
+        assert item["unit_price"] == 14.75
+        assert item["supplier"] == "New Supplier"
+        assert item["reorder_level"] == 4
+
+
+def test_staff_cannot_update_component(client, admin_token, staff_token):
+    headers = auth(admin_token)
+    original = client.get("/api/inventory/1", headers=headers).json()
+
+    response = client.patch(
+        "/api/inventory/1",
+        json={
+            "quantity": 99,
+            "unit_price": 99.99,
+            "supplier": "Unauthorized Supplier",
+            "reorder_level": 99,
+        },
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 403
+    unchanged = client.get("/api/inventory/1", headers=headers).json()
+    assert unchanged["quantity"] == original["quantity"]
+    assert unchanged["unit_price"] == original["unit_price"]
+    assert unchanged["supplier"] == original["supplier"]
+    assert unchanged["reorder_level"] == original["reorder_level"]
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"quantity": -1},
+        {"unit_price": -0.01},
+        {"reorder_level": -1},
+        {"supplier": "   "},
+    ],
+)
+def test_invalid_component_updates_are_rejected(
+    client, admin_token, payload
+):
+    headers = auth(admin_token)
+    original = client.get("/api/inventory/1", headers=headers).json()
+
+    response = client.patch(
+        "/api/inventory/1",
+        json=payload,
+        headers=headers,
+    )
+
+    assert response.status_code == 422
+    unchanged = client.get("/api/inventory/1", headers=headers).json()
+    assert unchanged["quantity"] == original["quantity"]
+    assert unchanged["unit_price"] == original["unit_price"]
+    assert unchanged["supplier"] == original["supplier"]
+    assert unchanged["reorder_level"] == original["reorder_level"]
+
+
 def test_admin_can_add_update_delete_and_audit(client, admin_token):
     h = auth(admin_token)
 

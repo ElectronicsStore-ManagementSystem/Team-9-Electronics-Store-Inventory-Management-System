@@ -192,15 +192,30 @@ def get_component(
     return component_response_data(component, user)
 
 @app.patch("/api/inventory/{component_id}", response_model=ComponentResponse)
-def update_component(component_id: int, payload: ComponentUpdate, db: Session = Depends(get_db), user: User = Depends(require_manager)):
+def update_component(
+    component_id: int,
+    payload: ComponentUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_manager),
+):
     component = db.get(Component, component_id)
     if not component or not component.active:
         raise HTTPException(status_code=404, detail="Component not found")
+
     for key, value in payload.model_dump(exclude_none=True).items():
-        setattr(component, key, value.strip() if key == "supplier" else value)
-    db.commit()
-    db.refresh(component)
-    return component
+        setattr(component, key, value)
+
+    try:
+        db.commit()
+        db.refresh(component)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="The component could not be updated due to a database error.",
+        ) from exc
+
+    return component_response_data(component, user)
 
 @app.delete("/api/inventory/{component_id}")
 def delete_component(component_id: int, db: Session = Depends(get_db), user: User = Depends(require_manager)):
