@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from .models import AuditLog, Component, User
@@ -27,8 +27,11 @@ def list_components(
     search: str | None = None,
     category: str | None = None,
     supplier: str | None = None,
+    status: str | None = None,
     sort: str = "id",
     allow_date_sort: bool = False,
+    limit: int | None = None,
+    offset: int = 0,
 ) -> list[Component]:
     descending = sort.startswith("-")
     sort_field = sort[1:] if descending else sort
@@ -63,11 +66,24 @@ def list_components(
         query = query.where(Component.category == category)
     if supplier:
         query = query.where(Component.supplier == supplier)
+    if status == "out-of-stock":
+        query = query.where(Component.quantity == 0)
+    elif status == "low-stock":
+        query = query.where(
+            and_(
+                Component.quantity > 0,
+                Component.quantity <= Component.reorder_level,
+            )
+        )
+    elif status == "in-stock":
+        query = query.where(Component.quantity > Component.reorder_level)
 
     query = query.order_by(
         sort_column.desc() if descending else sort_column.asc(),
         Component.id.asc(),
     )
+    if limit is not None:
+        query = query.limit(limit).offset(offset)
     return list(db.scalars(query))
 
 

@@ -62,6 +62,13 @@ API documentation is available at `/docs`.
 pytest -q
 ```
 
+The scalability regression test loads 10,000 components and verifies 20
+concurrent paginated inventory requests:
+
+```bash
+pytest -q tests/test_scalability.py
+```
+
 ## Sprint 1 Git workflow
 
 `main` is the integration branch. Each member works on a short-lived branch and opens a pull request. Do not commit directly to `main`.

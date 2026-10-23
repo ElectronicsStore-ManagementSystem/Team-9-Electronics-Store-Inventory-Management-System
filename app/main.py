@@ -54,12 +54,19 @@ def list_inventory(
     supplier: str | None = None,
     status: str | None = None,
     sort: str = Query(default="id"),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
     search = validate_search(search)
     category = validate_search(category)
     supplier = validate_search(supplier)
+    if status not in {None, "in-stock", "low-stock", "out-of-stock"}:
+        raise HTTPException(
+            status_code=422,
+            detail="Unsupported inventory status",
+        )
 
     try:
         components = repositories.list_components(
@@ -67,20 +74,17 @@ def list_inventory(
             search=search,
             category=category,
             supplier=supplier,
+            status=status,
             sort=sort,
             allow_date_sort=user.role == "ADMIN",
+            limit=limit,
+            offset=offset,
         )
     except ValueError as exc:
         raise HTTPException(
             status_code=422,
             detail="Unsupported inventory sort field",
         ) from exc
-
-    if status:
-        components = [
-            component for component in components
-            if stock_status(component) == status
-        ]
 
     return [component_response_data(component, user) for component in components]
 
