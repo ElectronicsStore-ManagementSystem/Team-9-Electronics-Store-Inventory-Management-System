@@ -970,3 +970,69 @@ def test_filter_inventory_with_no_matches(client, staff_token):
 
     assert response.status_code == 200
     assert response.json() == []
+
+# EIMS-F-011: Delete Component - additional coverage
+
+def test_delete_nonexistent_component_returns_404(client, admin_token):
+    response = client.delete(
+        "/api/inventory/999999",
+        headers=auth(admin_token),
+    )
+
+    assert response.status_code == 404
+
+
+def test_deleting_component_preserves_other_components(client, admin_token):
+    headers = auth(admin_token)
+
+    first = client.post(
+        "/api/inventory",
+        json={
+            "name": "Component To Delete",
+            "category": "Test",
+            "quantity": 5,
+            "unit_price": 100,
+            "supplier": "Test Supplier",
+            "reorder_level": 1,
+        },
+        headers=headers,
+    )
+    second = client.post(
+        "/api/inventory",
+        json={
+            "name": "Component To Preserve",
+            "category": "Test",
+            "quantity": 10,
+            "unit_price": 200,
+            "supplier": "Test Supplier",
+            "reorder_level": 2,
+        },
+        headers=headers,
+    )
+
+    assert first.status_code == 201, first.text
+    assert second.status_code == 201, second.text
+
+    first_id = first.json()["id"]
+    second_id = second.json()["id"]
+
+    deleted = client.delete(
+        f"/api/inventory/{first_id}",
+        headers=headers,
+    )
+    assert deleted.status_code == 200, deleted.text
+
+    inventory = client.get("/api/inventory", headers=headers)
+    assert inventory.status_code == 200
+    active_ids = {component["id"] for component in inventory.json()}
+
+    assert first_id not in active_ids
+    assert second_id in active_ids
+
+    second_after = client.get(
+        f"/api/inventory/{second_id}",
+        headers=headers,
+    )
+    assert second_after.status_code == 200
+    assert second_after.json()["name"] == "Component To Preserve"
+    assert second_after.json()["quantity"] == 10

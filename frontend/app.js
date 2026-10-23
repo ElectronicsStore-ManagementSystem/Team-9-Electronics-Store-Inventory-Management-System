@@ -965,6 +965,7 @@ function escapeHTML(value) {
 
 // ==================== DELETE COMPONENT ====================
 
+
 window.removeItem = async id => {
   if (!confirm('Are you sure you want to delete this component?')) {
     return;
@@ -976,8 +977,10 @@ window.removeItem = async id => {
     });
 
     await refresh();
+
+    alert('Component deleted successfully.');
   } catch (error) {
-    alert(error.message);
+    alert(`Failed to delete component: ${error.message}`);
   }
 };
 
