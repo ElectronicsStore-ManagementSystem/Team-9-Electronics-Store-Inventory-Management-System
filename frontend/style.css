@@ -836,6 +836,17 @@ td button:hover {
   font-size: 13px;
 }
 
+.form-feedback {
+  margin: 0 0 22px;
+  padding: 12px 15px;
+  color: #23744f;
+  background: #edf8f1;
+  border: 1px solid #d5eddf;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 #login-error,
 #form-error {
   margin-bottom: 0;

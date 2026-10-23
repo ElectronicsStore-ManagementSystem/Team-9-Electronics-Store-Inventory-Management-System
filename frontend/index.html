@@ -167,6 +167,8 @@
       <section id="stats" class="stats" aria-label="Inventory statistics">
       </section>
 
+      <p id="add-feedback" class="form-feedback hidden" role="status" aria-live="polite"></p>
+
       <!-- Inventory table -->
       <section class="table-card">
         <div class="table-heading">
@@ -284,13 +286,12 @@
           </label>
 
           <label>
-            Reorder level
+            Reorder level (optional)
             <input
               name="reorder_level"
               type="number"
               min="0"
               value="5"
-              required
             >
           </label>
 

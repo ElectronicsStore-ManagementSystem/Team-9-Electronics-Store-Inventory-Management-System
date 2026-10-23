@@ -95,6 +95,8 @@ $('logout').onclick = () => {
   $('inventory').innerHTML = '';
   $('stats').innerHTML = '';
   $('form-card').classList.add('hidden');
+  $('add-feedback').classList.add('hidden');
+  $('add-feedback').textContent = '';
 
   setLoggedIn();
 };
@@ -179,7 +181,10 @@ $('clear-filters').onclick = () => {
 // ==================== ADD COMPONENT FORM ====================
 
 $('add-btn').onclick = () => {
+  $('add-feedback').classList.add('hidden');
+  $('add-feedback').textContent = '';
   $('form-card').classList.remove('hidden');
+  $('form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
 
 $('cancel-add').onclick = () => {
@@ -187,32 +192,73 @@ $('cancel-add').onclick = () => {
   $('form-error').textContent = '';
 };
 
+const addTextFields = {
+  name: 'Component name',
+  category: 'Category',
+  supplier: 'Supplier'
+};
+for (const fieldName of Object.keys(addTextFields)) {
+  $('component-form').elements.namedItem(fieldName).addEventListener(
+    'input',
+    event => event.target.setCustomValidity('')
+  );
+}
+
 // Add component
 $('component-form').onsubmit = async event => {
   event.preventDefault();
   $('form-error').textContent = '';
 
-  const data = Object.fromEntries(
-    new FormData(event.target).entries()
-  );
+  const form = event.target;
+  for (const [fieldName, label] of Object.entries(addTextFields)) {
+    const field = form.elements.namedItem(fieldName);
+    field.value = field.value.trim();
+    field.setCustomValidity(
+      field.value ? '' : `${label} is required.`
+    );
+  }
+
+  if (!form.reportValidity()) return;
+
+  const data = Object.fromEntries(new FormData(form).entries());
 
   data.quantity = Number(data.quantity);
   data.unit_price = Number(data.unit_price);
-  data.reorder_level = Number(data.reorder_level);
+  if (data.reorder_level === '') {
+    delete data.reorder_level;
+  } else {
+    data.reorder_level = Number(data.reorder_level);
+  }
+
+  const submitButton = form.querySelector('[type="submit"]');
+  submitButton.disabled = true;
+  submitButton.textContent = 'Saving...';
 
   try {
-    await api('/api/inventory', {
+    const component = await api('/api/inventory', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
 
-    event.target.reset();
+    form.reset();
     $('form-card').classList.add('hidden');
+    $('add-feedback').textContent =
+      `${component.name} added successfully (SKU: ${component.sku}).`;
+    $('add-feedback').classList.remove('hidden');
 
+    $('search').value = '';
+    $('category').value = '';
+    $('supplier').value = '';
+    $('status').value = '';
+    $('sort-by').value = 'id';
+    $('sort-order').value = 'asc';
     await refresh();
   } catch (error) {
     $('form-error').textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = 'Save component';
   }
 };
 

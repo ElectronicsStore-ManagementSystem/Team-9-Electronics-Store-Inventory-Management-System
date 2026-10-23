@@ -117,11 +117,137 @@ def test_staff_cannot_add_or_delete(client, staff_token):
         json=payload,
         headers=h,
     ).status_code == 403
+    assert len(client.get("/api/inventory", headers=h).json()) == 3
 
     assert client.delete(
         "/api/inventory/1",
         headers=h,
     ).status_code == 403
+
+
+def test_manager_can_add_component_and_find_it_afterward(client):
+    from app.db import SessionLocal
+    from app.models import User
+    from app.security import hash_password
+
+    db = SessionLocal()
+    try:
+        db.add(
+            User(
+                username="adding_manager",
+                password_hash=hash_password("Manager@12345"),
+                role="MANAGER",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "adding_manager", "password": "Manager@12345"},
+    )
+    assert login.status_code == 200
+    headers = auth(login.json()["access_token"])
+    payload = {
+        "name": "New Stock Component",
+        "category": "Connectors",
+        "quantity": 24,
+        "unit_price": 3.75,
+        "supplier": "Parts Warehouse",
+    }
+
+    created = client.post("/api/inventory", json=payload, headers=headers)
+    assert created.status_code == 201
+    item = created.json()
+    assert item["sku"].startswith("EIMS-")
+    assert item["id"] is not None
+    assert item["reorder_level"] == 5
+
+    listed = client.get("/api/inventory", headers=headers)
+    assert listed.status_code == 200
+    assert any(
+        component["id"] == item["id"]
+        and component["name"] == payload["name"]
+        and component["category"] == payload["category"]
+        and component["quantity"] == payload["quantity"]
+        and component["unit_price"] == payload["unit_price"]
+        and component["supplier"] == payload["supplier"]
+        for component in listed.json()
+    )
+
+    reopened = client.get(
+        f"/api/inventory/{item['id']}",
+        headers=headers,
+    )
+    assert reopened.status_code == 200
+    assert reopened.json()["sku"] == item["sku"]
+
+
+@pytest.mark.parametrize(
+    "missing_field",
+    ["name", "category", "quantity", "unit_price", "supplier"],
+)
+def test_add_component_requires_all_mandatory_fields(
+    client, admin_token, missing_field
+):
+    payload = {
+        "name": "Validation Component",
+        "category": "Validation",
+        "quantity": 5,
+        "unit_price": 2.5,
+        "supplier": "Validation Supplier",
+    }
+    del payload[missing_field]
+
+    response = client.post(
+        "/api/inventory",
+        json=payload,
+        headers=auth(admin_token),
+    )
+
+    assert response.status_code == 422
+    assert len(client.get(
+        "/api/inventory",
+        headers=auth(admin_token),
+    ).json()) == 3
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("name", "   "),
+        ("category", "   "),
+        ("supplier", "   "),
+        ("quantity", -1),
+        ("unit_price", -0.01),
+        ("unit_price", "NaN"),
+        ("reorder_level", -1),
+    ],
+)
+def test_add_component_rejects_invalid_values(
+    client, admin_token, field, value
+):
+    payload = {
+        "name": "Validation Component",
+        "category": "Validation",
+        "quantity": 5,
+        "unit_price": 2.5,
+        "supplier": "Validation Supplier",
+    }
+    payload[field] = value
+
+    response = client.post(
+        "/api/inventory",
+        json=payload,
+        headers=auth(admin_token),
+    )
+
+    assert response.status_code == 422
+    assert len(client.get(
+        "/api/inventory",
+        headers=auth(admin_token),
+    ).json()) == 3
 
 
 def test_authorized_manager_can_update_all_editable_component_fields(
