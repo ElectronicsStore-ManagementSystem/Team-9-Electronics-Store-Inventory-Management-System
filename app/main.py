@@ -1,7 +1,7 @@
 from pathlib import Path
 import io
 import uuid
-
+from datetime import datetime, timezone
 from fastapi import Depends, FastAPI, HTTPException, Query, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -60,8 +60,11 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = repositories.find_user_by_username(db, payload.username.strip())
     if not user or not user.active or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return LoginResponse(access_token=create_access_token(user), role=user.role)
 
+    user.last_activity = datetime.now(timezone.utc)
+    db.commit()
+
+    return LoginResponse(access_token=create_access_token(user), role=user.role)
 @app.get("/api/me")
 def me(user: User = Depends(get_current_user)):
     return {"id": user.id, "username": user.username, "role": user.role}

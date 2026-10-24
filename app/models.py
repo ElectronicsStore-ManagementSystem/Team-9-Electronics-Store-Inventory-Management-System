@@ -10,6 +10,10 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[str] = mapped_column(String(20), default="STAFF")
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_activity: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
 
 class Component(Base):
     __tablename__ = "components"

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -1135,3 +1135,69 @@ def test_deleting_component_preserves_other_components(client, admin_token):
     assert second_after.status_code == 200
     assert second_after.json()["name"] == "Component To Preserve"
     assert second_after.json()["quantity"] == 10
+
+
+
+def test_active_session_remains_valid(client, admin_token):
+    response = client.get(
+        "/api/me",
+        headers=auth(admin_token),
+    )
+
+    assert response.status_code == 200
+
+
+def test_inactive_session_expires_after_15_minutes(client, admin_token):
+    from app.db import SessionLocal
+    from app.models import User
+
+    db = SessionLocal()
+    try:
+        admin = db.query(User).filter_by(username="admin").one()
+        admin.last_activity = datetime.now(timezone.utc) - timedelta(minutes=15)
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get(
+        "/api/me",
+        headers=auth(admin_token),
+    )
+
+    assert response.status_code == 401
+    assert "Session expired" in response.json()["detail"]
+
+
+def test_user_can_login_again_after_session_expires(client, admin_token):
+    from app.db import SessionLocal
+    from app.models import User
+
+    db = SessionLocal()
+    try:
+        admin = db.query(User).filter_by(username="admin").one()
+        admin.last_activity = datetime.now(timezone.utc) - timedelta(minutes=16)
+        db.commit()
+    finally:
+        db.close()
+
+    expired_response = client.get(
+        "/api/me",
+        headers=auth(admin_token),
+    )
+
+    assert expired_response.status_code == 401
+
+    login_response = client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "Admin@12345"},
+    )
+
+    assert login_response.status_code == 200
+
+    new_token = login_response.json()["access_token"]
+    new_response = client.get(
+        "/api/me",
+        headers=auth(new_token),
+    )
+
+    assert new_response.status_code == 200
