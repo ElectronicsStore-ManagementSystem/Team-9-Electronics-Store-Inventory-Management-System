@@ -130,3 +130,56 @@ def test_availability_report_excludes_inactive_components(client, admin_token):
     names = [item["name"] for item in report.json()]
 
     assert "Arduino Uno" not in names
+
+
+def test_availability_report_filters_in_stock(client, staff_token):
+    response = client.get(
+        "/api/reports/availability?status=in-stock",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()
+    assert all(item["status"] == "in-stock" for item in response.json())
+
+
+def test_availability_report_filters_low_stock(client, staff_token):
+    response = client.get(
+        "/api/reports/availability?status=low-stock",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()
+    assert all(item["status"] == "low-stock" for item in response.json())
+
+
+def test_availability_report_filters_out_of_stock(client, staff_token):
+    response = client.get(
+        "/api/reports/availability?status=out-of-stock",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()
+    assert all(item["status"] == "out-of-stock" for item in response.json())
+
+
+def test_availability_report_rejects_invalid_status(client, staff_token):
+    response = client.get(
+        "/api/reports/availability?status=invalid",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 400
+
+
+
+def test_availability_report_returns_empty_for_no_matches(client, staff_token):
+    response = client.get(
+        "/api/reports/availability?status=low-stock",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+    assert response.json()
