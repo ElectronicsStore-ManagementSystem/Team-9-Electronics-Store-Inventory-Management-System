@@ -9,13 +9,31 @@ from app.db import Base, engine
 from app.main import app
 from app.db import SessionLocal
 from sqlalchemy import delete
-from app.models import AuditLog, Component, User
+from app.models import (
+    AuditLog,
+    AvailabilityCheck,
+    Component,
+    DowntimeIncident,
+    MaintenanceWindow,
+    User,
+)
 
 @pytest.fixture(autouse=True)
 def clean_db():
     Base.metadata.create_all(bind=engine)
-    db=SessionLocal()
-    db.execute(delete(AuditLog)); db.execute(delete(Component)); db.execute(delete(User)); db.commit(); db.close()
+
+    db = SessionLocal()
+
+    db.execute(delete(AvailabilityCheck))
+    db.execute(delete(DowntimeIncident))
+    db.execute(delete(MaintenanceWindow))
+    db.execute(delete(AuditLog))
+    db.execute(delete(Component))
+    db.execute(delete(User))
+
+    db.commit()
+    db.close()
+
     seed_demo_data()
     yield
 

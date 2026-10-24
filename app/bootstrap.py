@@ -1,7 +1,13 @@
 from sqlalchemy import inspect, text
 
 from .db import Base, SessionLocal, engine
-from .models import Component, User
+from .models import (
+    AvailabilityCheck,
+    Component,
+    DowntimeIncident,
+    MaintenanceWindow,
+    User,
+)
 from .repositories import find_user_by_username, insert_seed_records
 from .security import hash_password
 def seed_demo_data() -> None:
