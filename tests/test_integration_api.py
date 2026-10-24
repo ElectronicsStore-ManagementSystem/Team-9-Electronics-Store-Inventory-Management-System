@@ -481,6 +481,10 @@ def test_invalid_component_updates_are_rejected(
 def test_admin_can_add_update_delete_and_audit(client, admin_token):
     h = auth(admin_token)
 
+    current_user = client.get("/api/me", headers=h)
+    assert current_user.status_code == 200
+    admin_id = current_user.json()["id"]
+
     payload = {
         "name": "Test MCU",
         "category": "Microcontroller",
@@ -516,10 +520,20 @@ def test_admin_can_add_update_delete_and_audit(client, admin_token):
 
     logs = client.get("/api/audit-logs", headers=h)
     assert logs.status_code == 200
-    assert any(
-        x["component_id"] == item["id"]
-        for x in logs.json()
-    )
+
+    matching_logs = [
+        log for log in logs.json()
+        if log["component_id"] == item["id"]
+    ]
+
+    assert len(matching_logs) == 1
+
+    audit_log = matching_logs[0]
+    assert audit_log["user_id"] == admin_id
+    assert audit_log["action"] == "DELETE_COMPONENT"
+    assert audit_log["component_name"] == item["name"]
+    assert audit_log["timestamp"] is not None
+
 
 
 def test_duplicate_sku_is_impossible_through_create(client, admin_token):
@@ -973,13 +987,25 @@ def test_filter_inventory_with_no_matches(client, staff_token):
 
 # EIMS-F-011: Delete Component - additional coverage
 
-def test_delete_nonexistent_component_returns_404(client, admin_token):
+
+def test_delete_nonexistent_component_returns_404_without_audit_log(client, admin_token):
+    headers = auth(admin_token)
+
+    logs_before = client.get("/api/audit-logs", headers=headers)
+    assert logs_before.status_code == 200
+    initial_count = len(logs_before.json())
+
     response = client.delete(
         "/api/inventory/999999",
-        headers=auth(admin_token),
+        headers=headers,
     )
 
     assert response.status_code == 404
+
+    logs_after = client.get("/api/audit-logs", headers=headers)
+    assert logs_after.status_code == 200
+    assert len(logs_after.json()) == initial_count
+
 
 
 def test_deleting_component_preserves_other_components(client, admin_token):
