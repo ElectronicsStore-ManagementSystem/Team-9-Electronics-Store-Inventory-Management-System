@@ -175,7 +175,7 @@ def test_availability_report_rejects_invalid_status(client, staff_token):
 
 
 
-def test_availability_report_returns_empty_for_no_matches(client, staff_token):
+def test_availability_report_returns_matching_results(client, staff_token):
     response = client.get(
         "/api/reports/availability?status=low-stock",
         headers=auth(staff_token),
@@ -183,3 +183,4 @@ def test_availability_report_returns_empty_for_no_matches(client, staff_token):
 
     assert response.status_code == 200
     assert response.json()
+    assert all(item["status"] == "low-stock" for item in response.json())
