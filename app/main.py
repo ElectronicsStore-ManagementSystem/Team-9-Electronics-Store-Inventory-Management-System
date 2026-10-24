@@ -1,3 +1,10 @@
+import csv
+
+from fastapi.responses import FileResponse, Response
+from openpyxl import Workbook
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
 from pathlib import Path
 import io
 import uuid
@@ -372,6 +379,103 @@ def availability(
         ) == status or status is None
     ]
 
+@app.get("/api/reports/availability/export")
+def export_availability_report(
+    format: str = Query(..., pattern="^(pdf|excel|csv)$"),
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    # Reuse the existing report so exports contain exactly the same data.
+    report_data = availability(status=status, db=db, user=user)
+
+    columns = [
+        "SKU",
+        "Name",
+        "Category",
+        "Quantity",
+        "Unit Price",
+        "Supplier",
+        "Reorder Level",
+        "Stock Status",
+    ]
+
+    rows = [
+        [
+            item["sku"],
+            item["name"],
+            item["category"],
+            item["quantity"],
+            item["unit_price"],
+            item["supplier"],
+            item["reorder_level"],
+            item["status"],
+        ]
+        for item in report_data
+    ]
+
+    output = io.BytesIO()
+
+    if format == "csv":
+        import csv
+
+        text_output = io.StringIO()
+        writer = csv.writer(text_output)
+        writer.writerow(columns)
+        writer.writerows(rows)
+
+        return Response(
+            content=text_output.getvalue(),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": 'attachment; filename="availability_report.csv"'
+            },
+        )
+
+    if format == "excel":
+        workbook = Workbook()
+        worksheet = workbook.active
+        worksheet.title = "Availability Report"
+        worksheet.append(columns)
+
+        for row in rows:
+            worksheet.append(row)
+
+        workbook.save(output)
+
+        return Response(
+            content=output.getvalue(),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": 'attachment; filename="availability_report.xlsx"'
+            },
+        )
+
+    # PDF export
+    document = SimpleDocTemplate(
+        output,
+        pagesize=landscape(A4),
+        title="Availability Report",
+    )
+
+    table = Table([columns] + rows, repeatRows=1)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#243b64")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+        ("PADDING", (0, 0), (-1, -1), 6),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+    ]))
+
+    document.build([table])
+
+    return Response(
+        content=output.getvalue(),
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": 'attachment; filename="availability_report.pdf"'
+        },
+    )
 
 @app.get("/api/reports/system-availability")
 def system_availability(
