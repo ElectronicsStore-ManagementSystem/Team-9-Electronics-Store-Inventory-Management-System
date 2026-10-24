@@ -52,3 +52,66 @@ def test_inventory_supports_10000_components_and_20_concurrent_users(
             for component in response.json()
         }
     ) == 2_000
+
+
+def test_dashboard_and_inventory_meet_3_second_target(client, admin_token):
+    _populate_components(10_000)
+
+    headers = {"Authorization": f"Bearer {admin_token}"}
+
+    # Warm up both endpoints.
+    assert client.get("/api/dashboard", headers=headers).status_code == 200
+    assert client.get(
+        "/api/inventory",
+        params={"search": "Load Component", "limit": 100},
+        headers=headers,
+    ).status_code == 200
+
+    def measure_request(path, params=None):
+        started = perf_counter()
+        response = client.get(path, params=params, headers=headers)
+        elapsed = perf_counter() - started
+
+        assert response.status_code == 200
+        return elapsed, response
+
+    # Simulate 10 concurrent users making 20 requests.
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        dashboard_results = list(
+            executor.map(
+                lambda _: measure_request("/api/dashboard"),
+                range(20),
+            )
+        )
+
+        inventory_results = list(
+            executor.map(
+                lambda page: measure_request(
+                    "/api/inventory",
+                    {
+                        "search": "Load Component",
+                        "limit": 100,
+                        "offset": page * 100,
+                    },
+                ),
+                range(20),
+            )
+        )
+
+    for label, results in [
+        ("Dashboard", dashboard_results),
+        ("Inventory", inventory_results),
+    ]:
+        times = [elapsed for elapsed, response in results]
+        percentage = sum(time <= 3 for time in times) / len(times) * 100
+
+        print(f"{label}: {percentage:.0f}% completed within 3 seconds")
+
+        assert percentage >= 90, (
+            f"{label} failed the 3-second performance target"
+        )
+
+    assert all(
+        len(response.json()) == 100
+        for elapsed, response in inventory_results
+    )

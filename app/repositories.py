@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from .models import AuditLog, Component, User
@@ -144,3 +144,94 @@ def list_audit_logs(db: Session) -> list[AuditLog]:
     return list(
         db.scalars(select(AuditLog).order_by(AuditLog.timestamp.desc()))
     )
+
+
+def get_dashboard_summary(db: Session) -> dict:
+    """Calculate dashboard summaries directly in the database."""
+
+    low_stock_condition = and_(
+        Component.quantity > 0,
+        Component.quantity <= Component.reorder_level,
+    )
+
+    # Calculate overall statistics in one database query.
+    totals = db.execute(
+        select(
+            func.count(Component.id),
+            func.coalesce(
+                func.sum(Component.quantity * Component.unit_price), 0
+            ),
+            func.coalesce(
+                func.sum(case((low_stock_condition, 1), else_=0)), 0
+            ),
+        ).where(Component.active.is_(True))
+    ).one()
+
+    # Get low-stock components only.
+    low_stock_components = list(
+        db.scalars(
+            select(Component)
+            .where(Component.active.is_(True), low_stock_condition)
+            .order_by(Component.id)
+        )
+    )
+
+    # Fetch only the five most recently added components.
+    recently_added = list(
+        db.scalars(
+            select(Component)
+            .where(Component.active.is_(True))
+            .order_by(Component.created_at.desc(), Component.id.asc())
+            .limit(5)
+        )
+    )
+
+    # Calculate stock totals category-wise in SQL.
+    category_rows = db.execute(
+        select(
+            Component.category,
+            func.sum(Component.quantity),
+            func.count(Component.id),
+        )
+        .where(Component.active.is_(True))
+        .group_by(Component.category)
+        .order_by(Component.category)
+    ).all()
+
+    # Calculate daily stock trends in SQL.
+    date_column = func.date(Component.created_at)
+
+    trend_rows = db.execute(
+        select(
+            date_column,
+            func.sum(Component.quantity),
+            func.count(Component.id),
+        )
+        .where(Component.active.is_(True))
+        .group_by(date_column)
+        .order_by(date_column)
+    ).all()
+
+    return {
+        "total_components": totals[0],
+        "total_stock_value": round(float(totals[1]), 2),
+        "low_stock_count": totals[2],
+        "low_stock_components": low_stock_components,
+        "recently_added": recently_added,
+        "category_stock": [
+            {
+                "category": category,
+                "quantity": quantity,
+                "component_count": count,
+            }
+            for category, quantity, count in category_rows
+        ],
+        "stock_trend": [
+            {
+                "date": date.isoformat() if hasattr(date, "isoformat") else str(date),
+                "quantity": quantity,
+                "component_count": count,
+            }
+            for date, quantity, count in trend_rows
+        ],
+    }
