@@ -15,6 +15,8 @@ Aligned with the supplied STP/SAD baseline:
 - Update quantity, price, supplier and reorder level
 - Delete component for Admin/Manager with confirmation handled by the UI and an audit record in the API
 - Availability classification: in-stock, low-stock and out-of-stock
+- Availability report API (`/api/reports/availability`) returns active components with their current stock quantities and stock status.
+- Integration tests verify all three stock classifications, updated inventory values and exclusion of inactive components.
 - Dashboard summary endpoint
 - Unit and integration tests
 - GitHub Actions build/test pipeline
