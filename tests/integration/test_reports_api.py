@@ -1,3 +1,7 @@
+import csv
+import io
+
+from openpyxl import load_workbook
 from fastapi.testclient import TestClient
 
 
@@ -184,3 +188,78 @@ def test_availability_report_returns_matching_results(client, staff_token):
     assert response.status_code == 200
     assert response.json()
     assert all(item["status"] == "low-stock" for item in response.json())
+
+def test_export_availability_report_as_csv(client, staff_token):
+    response = client.get(
+        "/api/reports/availability/export?format=csv",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    assert "attachment" in response.headers["content-disposition"]
+
+    rows = list(csv.reader(io.StringIO(response.text)))
+
+    assert rows[0] == [
+        "SKU", "Name", "Category", "Quantity",
+        "Unit Price", "Supplier", "Reorder Level", "Stock Status"
+    ]
+    assert len(rows) > 1
+    assert any(row[1] == "Arduino Uno" for row in rows[1:])
+
+
+def test_export_availability_report_as_excel(client, staff_token):
+    response = client.get(
+        "/api/reports/availability/export?format=excel",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+    assert "spreadsheetml" in response.headers["content-type"]
+
+    workbook = load_workbook(io.BytesIO(response.content))
+    worksheet = workbook.active
+
+    assert worksheet["A1"].value == "SKU"
+    assert worksheet["B1"].value == "Name"
+    assert worksheet.max_row > 1
+    assert any(
+        row[1] == "Arduino Uno"
+        for row in worksheet.iter_rows(min_row=2, values_only=True)
+    )
+
+
+def test_export_availability_report_as_pdf(client, staff_token):
+    response = client.get(
+        "/api/reports/availability/export?format=pdf",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+    assert response.content.startswith(b"%PDF-")
+    assert response.headers["content-type"] == "application/pdf"
+    assert "attachment" in response.headers["content-disposition"]
+
+
+def test_export_availability_report_with_stock_filter(client, staff_token):
+    response = client.get(
+        "/api/reports/availability/export?format=csv&status=low-stock",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+
+    rows = list(csv.DictReader(io.StringIO(response.text)))
+
+    assert rows
+    assert all(row["Stock Status"] == "low-stock" for row in rows)
+
+
+def test_export_availability_report_rejects_invalid_format(client, staff_token):
+    response = client.get(
+        "/api/reports/availability/export?format=doc",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 422

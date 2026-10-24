@@ -1,4 +1,52 @@
 let token = localStorage.getItem('eims_token');
+// ==================== AVAILABILITY REPORT EXPORTS ====================
+
+async function exportAvailabilityReport(format) {
+  const status = $('report-status').value;
+  const query = new URLSearchParams({ format });
+
+  if (status) {
+    query.set('status', status);
+  }
+
+  const feedback = $('report-feedback');
+
+  try {
+    feedback.textContent = `Generating ${format.toUpperCase()} report...`;
+
+    const response = await fetch(
+      `/api/reports/availability/export?${query.toString()}`,
+      {
+        headers: token
+          ? { Authorization: `Bearer ${token}` }
+          : {}
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Unable to export the report. Please try again.');
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+
+    link.href = url;
+    link.download = `availability_report.${format === 'excel' ? 'xlsx' : format}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    URL.revokeObjectURL(url);
+    feedback.textContent = `${format.toUpperCase()} report downloaded successfully.`;
+  } catch (error) {
+    feedback.textContent = error.message;
+  }
+}
+
+$('export-pdf').onclick = () => exportAvailabilityReport('pdf');
+$('export-excel').onclick = () => exportAvailabilityReport('excel');
+$('export-csv').onclick = () => exportAvailabilityReport('csv');
 let role = localStorage.getItem('eims_role');
 
 const $ = id => document.getElementById(id);

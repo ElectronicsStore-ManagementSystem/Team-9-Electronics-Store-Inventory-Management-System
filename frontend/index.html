@@ -231,6 +231,44 @@
 
       <p id="add-feedback" class="form-feedback hidden" role="status" aria-live="polite"></p>
 
+      <!-- Availability report and exports -->
+      <section class="table-card" aria-labelledby="availability-report-title">
+        <div class="table-heading">
+          <div>
+            <h2 id="availability-report-title">Availability Report</h2>
+            <p>View component stock status and export the report.</p>
+          </div>
+        </div>
+
+        <div class="filter-actions">
+          <label>
+            Stock status
+            <select id="report-status">
+              <option value="">All components</option>
+              <option value="in-stock">In stock</option>
+              <option value="low-stock">Low stock</option>
+              <option value="out-of-stock">Out of stock</option>
+            </select>
+          </label>
+
+          <button type="button" class="secondary-button" id="export-pdf">
+            Export PDF
+          </button>
+
+          <button type="button" class="secondary-button" id="export-excel">
+            Export Excel
+          </button>
+
+          <button type="button" class="secondary-button" id="export-csv">
+            Export CSV
+          </button>
+        </div>
+
+        <p id="report-feedback" class="section-hint" role="status" aria-live="polite"></p>
+      </section>
+
+      <!-- Inventory table -->
+
       <!-- Inventory table -->
       <section class="table-card">
         <div class="table-heading">
