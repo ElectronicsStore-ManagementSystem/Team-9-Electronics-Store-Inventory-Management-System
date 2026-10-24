@@ -1,9 +1,9 @@
+from sqlalchemy import inspect, text
+
 from .db import Base, SessionLocal, engine
 from .models import Component, User
 from .repositories import find_user_by_username, insert_seed_records
 from .security import hash_password
-
-
 def seed_demo_data() -> None:
     db = SessionLocal()
     try:
@@ -57,4 +57,16 @@ def seed_demo_data() -> None:
 
 def initialize_database() -> None:
     Base.metadata.create_all(bind=engine)
+
+    columns = {
+        column["name"]
+        for column in inspect(engine).get_columns("users")
+    }
+
+    if "last_activity" not in columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text("ALTER TABLE users ADD COLUMN last_activity DATETIME")
+            )
+
     seed_demo_data()

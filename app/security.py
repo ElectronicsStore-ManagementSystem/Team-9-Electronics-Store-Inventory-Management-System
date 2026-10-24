@@ -6,7 +6,11 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
-from .config import ACCESS_TOKEN_MINUTES, SECRET_KEY
+from .config import (
+    ACCESS_TOKEN_MINUTES,
+    SECRET_KEY,
+    SESSION_IDLE_TIMEOUT_MINUTES,
+)
 from .db import get_db
 from .models import User
 
@@ -64,15 +68,23 @@ def create_access_token(user: User) -> str:
     payload = {"sub": str(user.id), "username": user.username, "role": user.role, "iat": now, "exp": now + timedelta(minutes=ACCESS_TOKEN_MINUTES)}
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer), db: Session = Depends(get_db)) -> User:
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer),
+    db: Session = Depends(get_db),
+) -> User:
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
     try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            credentials.credentials,
+            SECRET_KEY,
+            algorithms=[ALGORITHM],
+        )
         user_id = int(payload["sub"])
     except (jwt.InvalidTokenError, KeyError, ValueError):
         raise HTTPException(
@@ -80,13 +92,36 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer)
             detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
     user = db.get(User, user_id)
+
     if not user or not user.active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User is inactive or missing",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+    now = datetime.now(timezone.utc)
+
+    if user.last_activity is not None:
+        last_activity = user.last_activity
+
+        if last_activity.tzinfo is None:
+            last_activity = last_activity.replace(tzinfo=timezone.utc)
+
+        if now - last_activity >= timedelta(
+            minutes=SESSION_IDLE_TIMEOUT_MINUTES
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session expired due to inactivity. Please log in again.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+    user.last_activity = now
+    db.commit()
+
     return user
 
 def require_manager(user: User = Depends(get_current_user)) -> User:
