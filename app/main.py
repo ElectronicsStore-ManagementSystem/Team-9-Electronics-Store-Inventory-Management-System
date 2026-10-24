@@ -334,16 +334,34 @@ def delete_component(component_id: int, db: Session = Depends(get_db), user: Use
     )
     return {"status": "deleted", "component_id": component.id}
 
+
 @app.get("/api/reports/availability", response_model=list[AvailabilityResponse])
-def availability(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def availability(
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    valid_statuses = {"in-stock", "low-stock", "out-of-stock"}
+
+    if status is not None and status not in valid_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid stock status. Use in-stock, low-stock, or out-of-stock.",
+        )
+
     components = repositories.list_active_components(db)
+
     return [
         {
             **component_response_data(component, user),
-            "status": stock_status(component),
+            "status": component_status,
         }
         for component in components
+        if (
+            component_status := stock_status(component)
+        ) == status or status is None
     ]
+
 
 @app.get("/api/dashboard", response_model=DashboardResponse)
 def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
