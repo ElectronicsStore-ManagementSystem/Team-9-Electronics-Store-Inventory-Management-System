@@ -202,12 +202,25 @@ def test_staff_cannot_add_or_delete(client, staff_token):
         json=payload,
         headers=h,
     ).status_code == 403
-    assert len(client.get("/api/inventory", headers=h).json()) == 3
 
-    assert client.delete(
+    inventory_before = client.get("/api/inventory", headers=h)
+    assert inventory_before.status_code == 200
+    assert len(inventory_before.json()) == 3
+
+    delete_response = client.delete(
         "/api/inventory/1",
         headers=h,
-    ).status_code == 403
+    )
+    assert delete_response.status_code == 403
+
+    inventory_after = client.get("/api/inventory", headers=h)
+    assert inventory_after.status_code == 200
+    assert len(inventory_after.json()) == 3
+
+    assert any(
+        component["id"] == 1
+        for component in inventory_after.json()
+    )
 
 
 def test_staff_cannot_update_components(client, staff_token):
@@ -277,6 +290,66 @@ def test_manager_can_add_component_and_find_it_afterward(client):
     )
     assert reopened.status_code == 200
     assert reopened.json()["sku"] == item["sku"]
+
+def test_manager_can_delete_component(client):
+    from app.db import SessionLocal
+    from app.models import User
+    from app.security import hash_password
+
+    db = SessionLocal()
+    try:
+        db.add(
+            User(
+                username="deleting_manager",
+                password_hash=hash_password("Manager@12345"),
+                role="MANAGER",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    login = client.post(
+        "/api/auth/login",
+        json={
+            "username": "deleting_manager",
+            "password": "Manager@12345",
+        },
+    )
+    assert login.status_code == 200
+    headers = auth(login.json()["access_token"])
+
+    created = client.post(
+        "/api/inventory",
+        json={
+            "name": "Manager Delete Test",
+            "category": "Connectors",
+            "quantity": 10,
+            "unit_price": 5,
+            "supplier": "Test Supplier",
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201
+
+    component_id = created.json()["id"]
+
+    deleted = client.delete(
+        f"/api/inventory/{component_id}",
+        headers=headers,
+    )
+    assert deleted.status_code == 200
+
+    remaining = client.get(
+        "/api/inventory",
+        headers=headers,
+    )
+    assert remaining.status_code == 200
+    assert all(
+        component["id"] != component_id
+        for component in remaining.json()
+    )
+
 
 
 @pytest.mark.parametrize(
