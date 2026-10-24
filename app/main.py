@@ -577,54 +577,28 @@ def system_availability(
 
 
 @app.get("/api/dashboard", response_model=DashboardResponse)
-def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
-    components = repositories.list_active_components(db)
-    total_value = sum(c.quantity * c.unit_price for c in components)
-    low_count = sum(stock_status(c) == "low-stock" for c in components)
-    low_stock_components = [
-        component for component in components
-        if stock_status(component) == "low-stock"
-    ]
-    recent = sorted(components, key=lambda c: c.created_at, reverse=True)[:5]
-    category_totals: dict[str, dict[str, int]] = {}
-    trend_totals: dict[str, dict[str, int]] = {}
-    for component in components:
-        category = category_totals.setdefault(
-            component.category,
-            {"quantity": 0, "component_count": 0},
-        )
-        category["quantity"] += component.quantity
-        category["component_count"] += 1
-
-        date = component.created_at.date().isoformat()
-        trend = trend_totals.setdefault(
-            date,
-            {"quantity": 0, "component_count": 0},
-        )
-        trend["quantity"] += component.quantity
-        trend["component_count"] += 1
+def dashboard(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    summary = repositories.get_dashboard_summary(db)
 
     return DashboardResponse(
-        total_components=len(components),
-        total_stock_value=round(total_value, 2),
-        low_stock_count=low_count,
+        total_components=summary["total_components"],
+        total_stock_value=summary["total_stock_value"],
+        low_stock_count=summary["low_stock_count"],
         low_stock_components=[
             component_response_data(component, user)
-            for component in low_stock_components
+            for component in summary["low_stock_components"]
         ],
         recently_added=[
             component_response_data(component, user)
-            for component in recent
+            for component in summary["recently_added"]
         ],
-        category_stock=[
-            {"category": category, **values}
-            for category, values in sorted(category_totals.items())
-        ],
-        stock_trend=[
-            {"date": date, **trend_totals[date]}
-            for date in sorted(trend_totals)
-        ],
+        category_stock=summary["category_stock"],
+        stock_trend=summary["stock_trend"],
     )
+
 
 @app.get("/api/audit-logs")
 def audit_logs(db: Session = Depends(get_db), user: User = Depends(require_manager)):
