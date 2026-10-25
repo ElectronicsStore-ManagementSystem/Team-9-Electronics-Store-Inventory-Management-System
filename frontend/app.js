@@ -178,8 +178,6 @@ $('logout').onclick = () => {
   setLoggedIn();
 };
 
-// ==================== INVENTORY CONTROLS ====================
-
 $('refresh').onclick = refresh;
 let searchTimer;
 $('search').oninput = () => {
