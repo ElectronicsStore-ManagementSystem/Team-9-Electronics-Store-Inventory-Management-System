@@ -28,7 +28,7 @@ from .models import (
     User,
 )
 from .schemas import ComponentCreate, ComponentResponse, ComponentUpdate, DashboardResponse, AvailabilityResponse, LoginRequest, LoginResponse
-from .security import create_access_token, get_current_user, require_manager, verify_password
+from .security import create_access_token, get_current_user, require_admin, require_manager, verify_password
 from .services import stock_status, validate_search
 from .config import ENFORCE_HTTPS
 from . import repositories
@@ -356,7 +356,7 @@ def delete_component(component_id: int, db: Session = Depends(get_db), user: Use
 def availability(
     status: str | None = None,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
 ):
     valid_statuses = {"in-stock", "low-stock", "out-of-stock"}
 
@@ -384,7 +384,7 @@ def export_availability_report(
     format: str = Query(..., pattern="^(pdf|excel|csv)$"),
     status: str | None = None,
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
 ):
     # Reuse the existing report so exports contain exactly the same data.
     report_data = availability(status=status, db=db, user=user)

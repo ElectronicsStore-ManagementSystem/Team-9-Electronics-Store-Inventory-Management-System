@@ -798,6 +798,53 @@ summary:focus-visible {
   overflow: hidden;
 }
 
+.availability-report {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.9fr) minmax(0, 1.5fr);
+  align-items: center;
+  gap: 12px 24px;
+  padding: 22px 24px 16px;
+}
+
+.availability-report .table-heading {
+  min-width: 0;
+  padding: 0;
+}
+
+.availability-report .filter-actions {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.3fr) repeat(3, minmax(105px, 1fr));
+  align-items: end;
+  gap: 9px;
+  margin: 0;
+}
+
+.availability-report .filter-actions label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #59677c;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.availability-report .filter-actions select,
+.availability-report .filter-actions button {
+  min-height: 42px;
+}
+
+.availability-report .filter-actions button {
+  justify-content: center;
+  padding-right: 10px;
+  padding-left: 10px;
+}
+
+.availability-report .section-hint {
+  grid-column: 1 / -1;
+  min-height: 18px;
+  margin: 0;
+}
+
 .table-heading {
   display: flex;
   align-items: center;
@@ -1194,6 +1241,20 @@ button.hidden {
     width: min(100% - 40px, 100%);
   }
 
+  .availability-report {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 18px 20px 14px;
+  }
+
+  .availability-report .filter-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .availability-report .filter-actions label {
+    grid-column: 1 / -1;
+  }
+
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1297,6 +1358,10 @@ button.hidden {
 
   .table-heading {
     padding: 18px 16px 15px;
+  }
+
+  .availability-report {
+    padding: 18px 16px 14px;
   }
 
   .card,

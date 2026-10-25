@@ -163,11 +163,7 @@ def test_component_details_are_available_to_authenticated_users(
         "/api/reports/availability",
         headers=auth(staff_token),
     )
-    assert staff_availability.status_code == 200
-    assert all(
-        item["created_at"] is None
-        for item in staff_availability.json()
-    )
+    assert staff_availability.status_code == 403
 
     assert client.get(
         "/api/inventory?sort=date_added",
@@ -692,8 +688,8 @@ def test_database_rejects_duplicate_sku_without_modifying_existing_record():
 
 
 
-def test_availability_and_dashboard(client, staff_token):
-    h = auth(staff_token)
+def test_availability_and_dashboard(client, admin_token):
+    h = auth(admin_token)
 
     availability = client.get(
         "/api/reports/availability",

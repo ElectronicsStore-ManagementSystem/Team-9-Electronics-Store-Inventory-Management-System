@@ -1,4 +1,8 @@
 let token = localStorage.getItem('eims_token');
+let role = localStorage.getItem('eims_role');
+
+const $ = id => document.getElementById(id);
+
 // ==================== AVAILABILITY REPORT EXPORTS ====================
 
 async function exportAvailabilityReport(format) {
@@ -47,9 +51,6 @@ async function exportAvailabilityReport(format) {
 $('export-pdf').onclick = () => exportAvailabilityReport('pdf');
 $('export-excel').onclick = () => exportAvailabilityReport('excel');
 $('export-csv').onclick = () => exportAvailabilityReport('csv');
-let role = localStorage.getItem('eims_role');
-
-const $ = id => document.getElementById(id);
 
 // ==================== API HELPER ====================
 
@@ -96,6 +97,7 @@ function setLoggedIn() {
   $('login-card').classList.toggle('hidden', !!token);
   $('app').classList.toggle('hidden', !token);
   $('logout').classList.toggle('hidden', !token);
+  $('availability-report').classList.toggle('hidden', role !== 'ADMIN');
   const dateSortOption = $('sort-by').querySelector('[data-admin-only]');
   dateSortOption.hidden = role !== 'ADMIN';
   dateSortOption.disabled = role !== 'ADMIN';
