@@ -1,4 +1,7 @@
 let token = localStorage.getItem('eims_token');
+let role = localStorage.getItem('eims_role');
+
+const $ = id => document.getElementById(id);
 // ==================== AVAILABILITY REPORT EXPORTS ====================
 
 async function exportAvailabilityReport(format) {
@@ -47,9 +50,7 @@ async function exportAvailabilityReport(format) {
 $('export-pdf').onclick = () => exportAvailabilityReport('pdf');
 $('export-excel').onclick = () => exportAvailabilityReport('excel');
 $('export-csv').onclick = () => exportAvailabilityReport('csv');
-let role = localStorage.getItem('eims_role');
 
-const $ = id => document.getElementById(id);
 
 // ==================== API HELPER ====================
 
