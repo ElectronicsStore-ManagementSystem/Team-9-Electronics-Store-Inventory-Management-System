@@ -2,6 +2,15 @@
 
 **Team 9 | Electronics Store Inventory Management System**
 
+## Team Members 
+
+1. Krishitha Kanakala ---PES2UG24CS234
+2. Jayashree D        --PES2UG24CS203
+3. Hemavathi E        --PES2UG24CS193
+4. Karan Maheshwari   --PES2UG24CS216
+
+
+
 EIMS is a web-based inventory management system designed for an electronics store. It provides inventory management, authentication, role-based access control, stock availability reporting, dashboard summaries, input validation, and automated testing.
 
 The application also includes monthly system availability reporting based on monitoring checks, downtime incidents, and scheduled maintenance.
