@@ -37,6 +37,16 @@ class ComponentCreate(BaseModel):
     reorder_level: int = Field(default=5, ge=0)
     image_url: str | None = Field(default=None, max_length=500)
 
+    @field_validator("image_url")
+    @classmethod
+    def validate_image_url(cls, value: str | None) -> str | None:
+        if value is not None:
+            raise ValueError(
+                "Image URLs must be assigned through the image upload endpoint."
+            )
+        return None
+
+
     @field_validator("name", "category", "supplier")
     @classmethod
     def trim_text(cls, value: str) -> str:
