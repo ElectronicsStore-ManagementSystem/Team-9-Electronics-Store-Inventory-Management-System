@@ -52,6 +52,7 @@ $('export-pdf').onclick = () => exportAvailabilityReport('pdf');
 $('export-excel').onclick = () => exportAvailabilityReport('excel');
 $('export-csv').onclick = () => exportAvailabilityReport('csv');
 
+
 // ==================== API HELPER ====================
 
 async function api(path, options = {}) {
