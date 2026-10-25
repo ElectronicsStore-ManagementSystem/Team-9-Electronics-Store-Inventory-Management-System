@@ -36,7 +36,7 @@
       <h2>Sign in</h2>
       <p>Log in to access the inventory dashboard.</p>
 
-      <form id="login-form">
+      <form id="login-form" method="post">
         <label for="username">Username</label>
         <input
           id="username"
@@ -173,10 +173,10 @@
         <div>
           <p class="eyebrow">QUICK START</p>
           <h2 id="quick-start-title">New to the inventory workspace?</h2>
-          <p>Search, review, or add a component in three simple steps.</p>
+          <p>Search, review or add a component in three simple steps.</p>
         </div>
         <ol>
-          <li><strong>Find it:</strong> type a name, SKU, or category above.</li>
+          <li><strong>Find it:</strong> type a name, SKU or category above.</li>
           <li><strong>Review it:</strong> select a component name to see details.</li>
           <li id="quick-start-add-step"><strong>Add it:</strong> choose <strong>Add component</strong> and complete the form.</li>
         </ol>
@@ -232,7 +232,7 @@
       <p id="add-feedback" class="form-feedback hidden" role="status" aria-live="polite"></p>
 
       <!-- Availability report and exports -->
-      <section class="table-card" aria-labelledby="availability-report-title">
+      <section id="availability-report" class="table-card availability-report" aria-labelledby="availability-report-title">
         <div class="table-heading">
           <div>
             <h2 id="availability-report-title">Availability Report</h2>

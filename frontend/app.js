@@ -2,6 +2,7 @@ let token = localStorage.getItem('eims_token');
 let role = localStorage.getItem('eims_role');
 
 const $ = id => document.getElementById(id);
+
 // ==================== AVAILABILITY REPORT EXPORTS ====================
 
 async function exportAvailabilityReport(format) {
@@ -97,6 +98,7 @@ function setLoggedIn() {
   $('login-card').classList.toggle('hidden', !!token);
   $('app').classList.toggle('hidden', !token);
   $('logout').classList.toggle('hidden', !token);
+  $('availability-report').classList.toggle('hidden', role !== 'ADMIN');
   const dateSortOption = $('sort-by').querySelector('[data-admin-only]');
   dateSortOption.hidden = role !== 'ADMIN';
   dateSortOption.disabled = role !== 'ADMIN';

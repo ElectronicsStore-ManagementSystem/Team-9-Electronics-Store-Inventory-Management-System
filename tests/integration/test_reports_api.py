@@ -67,10 +67,10 @@ def test_search_inventory_with_no_matches(client, staff_token):
 
 
 
-def test_availability_report_classifies_all_stock_statuses(client, staff_token):
+def test_availability_report_classifies_all_stock_statuses(client, admin_token):
     response = client.get(
         "/api/reports/availability",
-        headers=auth(staff_token),
+        headers=auth(admin_token),
     )
 
     assert response.status_code == 200
@@ -136,10 +136,10 @@ def test_availability_report_excludes_inactive_components(client, admin_token):
     assert "Arduino Uno" not in names
 
 
-def test_availability_report_filters_in_stock(client, staff_token):
+def test_availability_report_filters_in_stock(client, admin_token):
     response = client.get(
         "/api/reports/availability?status=in-stock",
-        headers=auth(staff_token),
+        headers=auth(admin_token),
     )
 
     assert response.status_code == 200
@@ -147,10 +147,10 @@ def test_availability_report_filters_in_stock(client, staff_token):
     assert all(item["status"] == "in-stock" for item in response.json())
 
 
-def test_availability_report_filters_low_stock(client, staff_token):
+def test_availability_report_filters_low_stock(client, admin_token):
     response = client.get(
         "/api/reports/availability?status=low-stock",
-        headers=auth(staff_token),
+        headers=auth(admin_token),
     )
 
     assert response.status_code == 200
@@ -158,10 +158,10 @@ def test_availability_report_filters_low_stock(client, staff_token):
     assert all(item["status"] == "low-stock" for item in response.json())
 
 
-def test_availability_report_filters_out_of_stock(client, staff_token):
+def test_availability_report_filters_out_of_stock(client, admin_token):
     response = client.get(
         "/api/reports/availability?status=out-of-stock",
-        headers=auth(staff_token),
+        headers=auth(admin_token),
     )
 
     assert response.status_code == 200
@@ -169,30 +169,30 @@ def test_availability_report_filters_out_of_stock(client, staff_token):
     assert all(item["status"] == "out-of-stock" for item in response.json())
 
 
-def test_availability_report_rejects_invalid_status(client, staff_token):
+def test_availability_report_rejects_invalid_status(client, admin_token):
     response = client.get(
         "/api/reports/availability?status=invalid",
-        headers=auth(staff_token),
+        headers=auth(admin_token),
     )
 
     assert response.status_code == 400
 
 
 
-def test_availability_report_returns_matching_results(client, staff_token):
+def test_availability_report_returns_matching_results(client, admin_token):
     response = client.get(
         "/api/reports/availability?status=low-stock",
-        headers=auth(staff_token),
+        headers=auth(admin_token),
     )
 
     assert response.status_code == 200
     assert response.json()
     assert all(item["status"] == "low-stock" for item in response.json())
 
-def test_export_availability_report_as_csv(client, staff_token):
+def test_export_availability_report_as_csv(client, admin_token):
     response = client.get(
         "/api/reports/availability/export?format=csv",
-        headers=auth(staff_token),
+        headers=auth(admin_token),
     )
 
     assert response.status_code == 200
@@ -209,10 +209,10 @@ def test_export_availability_report_as_csv(client, staff_token):
     assert any(row[1] == "Arduino Uno" for row in rows[1:])
 
 
-def test_export_availability_report_as_excel(client, staff_token):
+def test_export_availability_report_as_excel(client, admin_token):
     response = client.get(
         "/api/reports/availability/export?format=excel",
-        headers=auth(staff_token),
+        headers=auth(admin_token),
     )
 
     assert response.status_code == 200
@@ -230,10 +230,10 @@ def test_export_availability_report_as_excel(client, staff_token):
     )
 
 
-def test_export_availability_report_as_pdf(client, staff_token):
+def test_export_availability_report_as_pdf(client, admin_token):
     response = client.get(
         "/api/reports/availability/export?format=pdf",
-        headers=auth(staff_token),
+        headers=auth(admin_token),
     )
 
     assert response.status_code == 200
@@ -242,10 +242,10 @@ def test_export_availability_report_as_pdf(client, staff_token):
     assert "attachment" in response.headers["content-disposition"]
 
 
-def test_export_availability_report_with_stock_filter(client, staff_token):
+def test_export_availability_report_with_stock_filter(client, admin_token):
     response = client.get(
         "/api/reports/availability/export?format=csv&status=low-stock",
-        headers=auth(staff_token),
+        headers=auth(admin_token),
     )
 
     assert response.status_code == 200
@@ -256,10 +256,24 @@ def test_export_availability_report_with_stock_filter(client, staff_token):
     assert all(row["Stock Status"] == "low-stock" for row in rows)
 
 
-def test_export_availability_report_rejects_invalid_format(client, staff_token):
+def test_export_availability_report_rejects_invalid_format(client, admin_token):
     response = client.get(
         "/api/reports/availability/export?format=doc",
-        headers=auth(staff_token),
+        headers=auth(admin_token),
     )
 
     assert response.status_code == 422
+
+
+def test_staff_cannot_access_availability_report_or_exports(client, staff_token):
+    report = client.get(
+        "/api/reports/availability",
+        headers=auth(staff_token),
+    )
+    export = client.get(
+        "/api/reports/availability/export?format=csv",
+        headers=auth(staff_token),
+    )
+
+    assert report.status_code == 403
+    assert export.status_code == 403
