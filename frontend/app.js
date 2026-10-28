@@ -392,8 +392,9 @@ $('add-btn').onclick = () => {
 };
 
 $('cancel-add').onclick = () => {
+  $('component-form').reset();
+  clearFieldErrors();
   $('form-card').classList.add('hidden');
-  $('form-error').textContent = '';
 };
 
 const addTextFields = {
@@ -448,8 +449,6 @@ $('component-form').onsubmit = async event => {
   }
 
   const submitButton = form.querySelector('[type="submit"]');
-  submitButton.disabled = true;
-  submitButton.textContent = 'Saving...';
 
   // Validate text fields before making an API request.
   let hasErrors = false;
@@ -501,6 +500,9 @@ $('component-form').onsubmit = async event => {
 
     return;
   }
+
+  submitButton.disabled = true;
+  submitButton.textContent = 'Saving...';
 
   try {
     const component = await api('/api/inventory', {
