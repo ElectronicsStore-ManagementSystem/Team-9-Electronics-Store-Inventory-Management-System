@@ -9,8 +9,6 @@
 3. Hemavathi E        --PES2UG24CS193
 4. Karan Maheshwari   --PES2UG24CS216
 
-<h4>Jira Scrum Board: https://kristak.atlassian.net/jira/software/projects/T9ESIMS/summary</h4>
-
 
 EIMS is a web-based inventory management system designed for an electronics store. It provides inventory management, authentication, role-based access control, stock availability reporting, dashboard summaries, input validation, and automated testing.
 
