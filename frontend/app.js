@@ -269,6 +269,16 @@ $('component-details').addEventListener('submit', async event => {
   }
 });
 $('close-component-dialog').onclick = () => $('component-dialog').close();
+$('component-dialog').addEventListener('cancel', event => {
+  event.preventDefault();
+  $('component-dialog').close();
+});
+$('component-dialog').addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    $('component-dialog').close();
+  }
+});
 $('component-dialog').addEventListener('click', event => {
   if (event.target === $('component-dialog')) {
     $('component-dialog').close();
