@@ -28,7 +28,7 @@ from .models import (
     MaintenanceWindow,
     User,
 )
-from .schemas import ComponentCreate, ComponentResponse, ComponentUpdate, DashboardResponse, AvailabilityResponse, LoginRequest, LoginResponse
+from .schemas import ComponentCreate, ComponentResponse, ComponentUpdate, DashboardResponse, AvailabilityResponse, LoginRequest, LoginResponse, SupplierCreate, SupplierResponse
 from .security import create_access_token, get_current_user, require_admin, require_manager, verify_password
 from .services import stock_status, validate_search
 from .config import ENFORCE_HTTPS
@@ -90,6 +90,50 @@ def component_response_data(component: Component, user: User) -> dict:
     if user.role != "ADMIN":
         data["created_at"] = None
     return data
+
+
+@app.get("/api/categories", response_model=list[str])
+def get_categories(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return repositories.list_categories(db)
+
+
+@app.get("/api/suppliers", response_model=list[str])
+def get_suppliers(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return repositories.list_suppliers(db)
+
+
+@app.post(
+    "/api/suppliers",
+    response_model=SupplierResponse,
+    status_code=201,
+)
+def add_supplier(
+    payload: SupplierCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_manager),
+):
+    try:
+        return repositories.create_supplier(db, payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="A supplier with this name already exists.",
+        ) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="The supplier could not be saved due to a database error.",
+        ) from exc
 
 
 @app.get("/api/inventory", response_model=list[ComponentResponse])

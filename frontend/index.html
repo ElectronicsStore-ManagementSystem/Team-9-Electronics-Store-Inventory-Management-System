@@ -105,6 +105,9 @@
               <button id="add-btn" class="hidden management-control" type="button">
                 <span aria-hidden="true">+</span> Add component
               </button>
+              <button id="supplier-btn" class="hidden management-control" type="button">
+                Manage suppliers
+              </button>
             </div>
           </div>
 
@@ -455,16 +458,14 @@
 
           <label>
             Supplier
-            <input
+            <select
               name="supplier"
-              type="text"
-              placeholder="Enter supplier name"
               required
-              minlength="1"
-              maxlength="120"
               aria-describedby="supplier-help supplier-error"
             >
-            <small id="supplier-help" class="field-help">Use the supplier's business name.</small>
+              <option value="">Choose a supplier</option>
+            </select>
+            <small id="supplier-help" class="field-help">Choose a supplier from the supplier catalog.</small>
             <span id="supplier-error" class="field-error" aria-live="polite"></span>
           </label>
 
@@ -488,6 +489,37 @@
         </form>
 
         <p id="form-error" class="error" role="alert" aria-live="assertive"></p>
+      </section>
+
+      <section id="supplier-card" class="card hidden">
+        <div class="form-heading">
+          <div>
+            <p class="eyebrow">CATALOG</p>
+            <h2>Manage suppliers</h2>
+            <p>Add suppliers for use in component forms and inventory filters.</p>
+          </div>
+          <button id="cancel-supplier" class="secondary-button" type="button">
+            Close
+          </button>
+        </div>
+        <form id="supplier-form" class="supplier-form">
+          <label for="supplier-name">Supplier name</label>
+          <div class="supplier-form-row">
+            <input
+              id="supplier-name"
+              name="name"
+              type="text"
+              maxlength="120"
+              placeholder="Enter supplier name"
+              required
+            >
+            <button type="submit">Add supplier</button>
+          </div>
+        </form>
+        <p id="supplier-feedback" class="form-feedback hidden" role="status" aria-live="polite"></p>
+        <p id="supplier-error" class="error" role="alert"></p>
+        <h3>Existing suppliers</h3>
+        <ul id="supplier-list" class="supplier-list"></ul>
       </section>
 
     </section>

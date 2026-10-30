@@ -134,6 +134,10 @@ function setLoggedIn() {
     'hidden',
     !['ADMIN', 'MANAGER'].includes(role)
   );
+  $('supplier-btn').classList.toggle(
+    'hidden',
+    !['ADMIN', 'MANAGER'].includes(role)
+  );
   const isStaff = role === 'STAFF';
   $('dashboard-role').textContent = isStaff
     ? 'Staff · Read-only view'
@@ -316,6 +320,58 @@ $('clear-filters').onclick = () => {
   $('sort-order').value = 'asc';
   refresh();
 };
+$('supplier-btn').onclick = () => {
+  $('supplier-feedback').classList.add('hidden');
+  $('supplier-feedback').textContent = '';
+  $('supplier-error').textContent = '';
+  $('supplier-card').classList.remove('hidden');
+  $('supplier-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('supplier-name').focus();
+};
+$('cancel-supplier').onclick = () => {
+  $('supplier-form').reset();
+  $('supplier-card').classList.add('hidden');
+  $('supplier-error').textContent = '';
+};
+$('supplier-form').onsubmit = async event => {
+  event.preventDefault();
+  const form = event.target;
+  const nameInput = $('supplier-name');
+  const name = nameInput.value.trim();
+  const submitButton = form.querySelector('[type="submit"]');
+  $('supplier-error').textContent = '';
+  $('supplier-feedback').classList.add('hidden');
+
+  if (!name) {
+    nameInput.setCustomValidity('Supplier name is required.');
+    nameInput.reportValidity();
+    return;
+  }
+
+  nameInput.setCustomValidity('');
+  submitButton.disabled = true;
+  submitButton.textContent = 'Saving...';
+  try {
+    const supplier = await api('/api/suppliers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    form.reset();
+    $('supplier-feedback').textContent =
+      `${supplier.name} added successfully.`;
+    $('supplier-feedback').classList.remove('hidden');
+    await refresh();
+  } catch (error) {
+    $('supplier-error').textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = 'Add supplier';
+  }
+};
+$('supplier-name').addEventListener('input', event => {
+  event.target.setCustomValidity('');
+});
 
 const componentFields = [
   'name',
@@ -437,7 +493,7 @@ const addTextFields = {
 };
 for (const fieldName of Object.keys(addTextFields)) {
   $('component-form').elements.namedItem(fieldName).addEventListener(
-    'input',
+    fieldName === 'supplier' ? 'change' : 'input',
     event => event.target.setCustomValidity('')
   );
 }
@@ -575,6 +631,45 @@ $('component-form').onsubmit = async event => {
 // ==================== LOAD AND FILTER INVENTORY ====================
 
 let currentComponent = null;
+let availableSuppliers = [];
+
+function populateSelect(select, values, placeholder) {
+  const selectedValue = select.value;
+  select.replaceChildren();
+
+  const defaultOption = document.createElement('option');
+  defaultOption.value = '';
+  defaultOption.textContent = placeholder;
+  select.append(defaultOption);
+
+  values.forEach(value => {
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = value;
+    select.append(option);
+  });
+
+  select.value = values.includes(selectedValue) ? selectedValue : '';
+}
+
+function renderSupplierList(suppliers) {
+  const list = $('supplier-list');
+  list.replaceChildren();
+
+  if (!suppliers.length) {
+    const item = document.createElement('li');
+    item.className = 'empty-state';
+    item.textContent = 'No suppliers have been added yet.';
+    list.append(item);
+    return;
+  }
+
+  suppliers.forEach(supplier => {
+    const item = document.createElement('li');
+    item.textContent = supplier;
+    list.append(item);
+  });
+}
 
 async function refresh() {
   if (!token) return;
@@ -1047,6 +1142,11 @@ if (imageForm) {
 }
 
 function renderComponentEditForm(component, errorMessage = '') {
+  const supplierOptions = availableSuppliers.map(supplier => `
+    <option value="${escapeHTML(supplier)}"${supplier === component.supplier ? ' selected' : ''}>
+      ${escapeHTML(supplier)}
+    </option>
+  `).join('');
   $('component-details').innerHTML = `
     <form id="component-edit-form" class="component-edit-form">
       <label>
@@ -1059,7 +1159,10 @@ function renderComponentEditForm(component, errorMessage = '') {
       </label>
       <label>
         Supplier
-        <input name="supplier" type="text" maxlength="120" value="${escapeHTML(component.supplier)}" required>
+        <select name="supplier" required>
+          <option value="">Choose a supplier</option>
+          ${supplierOptions}
+        </select>
       </label>
       <label>
         Reorder level
