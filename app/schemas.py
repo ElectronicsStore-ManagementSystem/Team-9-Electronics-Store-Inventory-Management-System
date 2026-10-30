@@ -198,3 +198,63 @@ class StockMovementResponse(BaseModel):
     reason: str
     timestamp: datetime
     user_id: int
+
+
+# ---------------- PURCHASE ORDER SCHEMAS ----------------
+
+class PurchaseOrderItemCreate(BaseModel):
+    component_id: int = Field(gt=0)
+    ordered_quantity: int = Field(gt=0)
+
+
+class PurchaseOrderCreate(BaseModel):
+    supplier_id: int = Field(gt=0)
+    items: list[PurchaseOrderItemCreate] = Field(min_length=1)
+
+
+class PurchaseOrderItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    component_id: int
+    ordered_quantity: int
+    received_quantity: int
+
+
+class PurchaseOrderResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    order_number: str
+    supplier_id: int
+    status: str
+    order_date: datetime
+    created_by: int
+    items: list[PurchaseOrderItemResponse]
+
+
+class PurchaseOrderStatusUpdate(BaseModel):
+    status: str = Field(
+        pattern="^(DRAFT|ORDERED|CANCELLED)$"
+    )
+
+
+class PurchaseOrderReceiveItem(BaseModel):
+    purchase_order_item_id: int = Field(gt=0)
+    received_quantity: int = Field(gt=0)
+
+
+class PurchaseOrderReceive(BaseModel):
+    idempotency_key: str = Field(min_length=1, max_length=100)
+    items: list[PurchaseOrderReceiveItem] = Field(min_length=1)
+
+
+class PurchaseOrderReceiptResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    purchase_order_item_id: int
+    received_quantity: int
+    received_at: datetime
+    received_by: int
+    idempotency_key: str

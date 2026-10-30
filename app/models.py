@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 
 class Supplier(Base):
@@ -173,3 +173,116 @@ class StockMovement(Base):
         ForeignKey("users.id"),
         nullable=False,
     )
+
+class PurchaseOrder(Base):
+    __tablename__ = "purchase_orders"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    order_number: Mapped[str] = mapped_column(
+        String(40),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+
+    supplier_id: Mapped[int] = mapped_column(
+        ForeignKey("suppliers.id"),
+        nullable=False,
+        index=True,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        default="DRAFT",
+    )
+
+    order_date: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    created_by: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+    items: Mapped[list["PurchaseOrderItem"]] = relationship(
+    back_populates="purchase_order",
+    cascade="all, delete-orphan",
+)
+
+
+class PurchaseOrderItem(Base):
+    __tablename__ = "purchase_order_items"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    purchase_order_id: Mapped[int] = mapped_column(
+        ForeignKey("purchase_orders.id"),
+        nullable=False,
+        index=True,
+    )
+
+    component_id: Mapped[int] = mapped_column(
+        ForeignKey("components.id"),
+        nullable=False,
+        index=True,
+    )
+
+    ordered_quantity: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    received_quantity: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+    
+    purchase_order: Mapped["PurchaseOrder"] = relationship(
+    back_populates="items"
+)
+
+    receipts: Mapped[list["PurchaseOrderReceipt"]] =       relationship(
+    back_populates="purchase_order_item",
+    cascade="all, delete-orphan",
+)
+
+class PurchaseOrderReceipt(Base):
+    __tablename__ = "purchase_order_receipts"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+
+    purchase_order_item_id: Mapped[int] = mapped_column(
+        ForeignKey("purchase_order_items.id"),
+        nullable=False,
+        index=True,
+    )
+
+    received_quantity: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    received_by: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+
+    idempotency_key: Mapped[str] = mapped_column(
+        String(100),
+        unique=True,
+        nullable=False,
+    )
+    purchase_order_item: Mapped["PurchaseOrderItem"] =   relationship(
+    back_populates="receipts"
+)

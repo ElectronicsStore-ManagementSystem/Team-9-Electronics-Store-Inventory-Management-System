@@ -18,6 +18,10 @@ from app.models import (
     MaintenanceWindow,
     Supplier,
     User,
+    StockMovement,
+    PurchaseOrder,
+    PurchaseOrderItem,
+    PurchaseOrderReceipt,
 )
 
 @pytest.fixture(autouse=True)
@@ -26,15 +30,22 @@ def clean_db():
 
     db = SessionLocal()
 
+    # Delete dependent records first
+    db.execute(delete(PurchaseOrderReceipt))
+    db.execute(delete(PurchaseOrderItem))
+    db.execute(delete(PurchaseOrder))
+
+    db.execute(delete(StockMovement))
     db.execute(delete(AvailabilityCheck))
     db.execute(delete(DowntimeIncident))
     db.execute(delete(MaintenanceWindow))
-    db.execute(delete(Supplier))
     db.execute(delete(AuditLog))
+
+# Delete parent records afterwards
+    db.execute(delete(Supplier))
     db.execute(delete(Component))
     db.execute(delete(Branch))
     db.execute(delete(User))
-
     db.commit()
     db.close()
 
