@@ -28,7 +28,17 @@ from .models import (
     MaintenanceWindow,
     User,
 )
-from .schemas import ComponentCreate, ComponentResponse, ComponentUpdate, DashboardResponse, AvailabilityResponse, LoginRequest, LoginResponse
+from .schemas import (
+    ComponentCreate,
+    ComponentResponse,
+    ComponentUpdate,
+    DashboardResponse,
+    AvailabilityResponse,
+    LoginRequest,
+    LoginResponse,
+    StockMovementCreate,
+    StockMovementResponse,
+)
 from .security import create_access_token, get_current_user, require_admin, require_manager, verify_password
 from .services import stock_status, validate_search
 from .config import ENFORCE_HTTPS
@@ -307,6 +317,76 @@ def get_component(
     if not component:
         raise HTTPException(status_code=404, detail="Component not found")
     return component_response_data(component, user)
+
+
+@app.post(
+    "/api/inventory/{component_id}/movements",
+    response_model=StockMovementResponse,
+    status_code=201,
+)
+def record_stock_movement(
+    component_id: int,
+    payload: StockMovementCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_manager),
+):
+    component = repositories.get_active_component(db, component_id)
+
+    if not component:
+        raise HTTPException(status_code=404, detail="Component not found")
+
+    if payload.movement_type == "STOCK_IN":
+        component.quantity += payload.quantity
+
+    elif payload.movement_type == "STOCK_OUT":
+        if payload.quantity > component.quantity:
+            raise HTTPException(
+                status_code=400,
+                detail="Insufficient stock available",
+            )
+
+        component.quantity -= payload.quantity
+
+    try:
+        movement = repositories.create_stock_movement(
+            db,
+            component,
+            user,
+            payload.movement_type,
+            payload.quantity,
+            payload.reason,
+        )
+
+        db.commit()
+        db.refresh(movement)
+
+        return movement
+
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Stock movement could not be recorded.",
+        ) from exc
+
+@app.get(
+    "/api/inventory/{component_id}/movements",
+    response_model=list[StockMovementResponse],
+)
+def get_stock_movement_history(
+    component_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    component = repositories.get_active_component(db, component_id)
+
+    if not component:
+        raise HTTPException(
+            status_code=404,
+            detail="Component not found",
+        )
+
+    return repositories.list_stock_movements(db, component_id)
 
 @app.patch("/api/inventory/{component_id}", response_model=ComponentResponse)
 def update_component(

@@ -91,3 +91,49 @@ class DowntimeIncident(Base):
         Text,
         nullable=True,
     )
+
+
+class StockMovement(Base):
+    __tablename__ = "stock_movements"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        primary_key=True,
+    )
+
+    component_id: Mapped[int] = mapped_column(
+        ForeignKey("components.id"),
+        nullable=False,
+        index=True,
+    )
+
+    component_name: Mapped[str] = mapped_column(
+        String(120),
+        nullable=False,
+    )
+
+    movement_type: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+
+    quantity: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+    )
+
+    reason: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+    )
+
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+    )

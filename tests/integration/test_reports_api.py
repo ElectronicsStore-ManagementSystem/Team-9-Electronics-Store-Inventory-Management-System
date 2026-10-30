@@ -95,12 +95,16 @@ def test_availability_report_reflects_updated_quantity(client, admin_token):
     )
 
     # Change its quantity to zero.
-    update = client.patch(
-        f"/api/inventory/{arduino['id']}",
-        json={"quantity": 0},
-        headers=headers,
-    )
-    assert update.status_code == 200
+    update = client.post(
+    f"/api/inventory/{arduino['id']}/movements",
+    json={
+        "movement_type": "STOCK_OUT",
+        "quantity": arduino["quantity"],
+        "reason": "Testing availability report after stock depletion",
+    },
+    headers=headers,
+)
+    assert update.status_code == 201
 
     # The report should show the updated quantity and status.
     report = client.get("/api/reports/availability", headers=headers)
