@@ -1,5 +1,7 @@
 import csv
 import os
+import logging
+
 
 from fastapi.responses import FileResponse, Response
 from openpyxl import Workbook
@@ -35,6 +37,7 @@ from .config import ENFORCE_HTTPS
 from . import repositories
 
 app = FastAPI(title="EIMS API", version="1.0.0")
+logger = logging.getLogger(__name__)
 if ENFORCE_HTTPS:
     app.add_middleware(HTTPSRedirectMiddleware)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -478,6 +481,7 @@ def export_availability_report(
         },
     )
 
+
 @app.get("/api/reports/system-availability")
 def system_availability(
     year: int = Query(..., ge=2000, le=2100),
@@ -487,199 +491,213 @@ def system_availability(
 ):
     from datetime import timedelta
 
-    now = datetime.now(timezone.utc)
+    try:
+        now = datetime.now(timezone.utc)
 
-    month_start = datetime(year, month, 1, tzinfo=timezone.utc)
+        month_start = datetime(year, month, 1, tzinfo=timezone.utc)
 
-    if month == 12:
-        month_end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
-    else:
-        month_end = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+        if month == 12:
+            month_end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            month_end = datetime(year, month + 1, 1, tzinfo=timezone.utc)
 
-    # Do not calculate availability for a future period.
-    reporting_end = min(month_end, now)
+        # Do not calculate availability for a future period.
+        reporting_end = min(month_end, now)
 
-    if reporting_end <= month_start:
-        return {
-            "year": year,
-            "month": month,
-            "monitoring_started": False,
-            "coverage_complete": False,
-            "availability_percentage": None,
-            "target_percentage": 99.5,
-            "target_met": None,
-            "message": "No monitoring period is available for this month.",
-        }
+        if reporting_end <= month_start:
+            return {
+                "year": year,
+                "month": month,
+                "monitoring_started": False,
+                "coverage_complete": False,
+                "availability_percentage": None,
+                "target_percentage": 99.5,
+                "target_met": None,
+                "message": "No monitoring period is available for this month.",
+            }
 
-    def as_utc(value):
-        if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+        def as_utc(value):
+            if value.tzinfo is None:
+                return value.replace(tzinfo=timezone.utc)
+            return value.astimezone(timezone.utc)
 
-    checks = db.query(AvailabilityCheck).filter(
-        AvailabilityCheck.checked_at >= month_start,
-        AvailabilityCheck.checked_at < reporting_end,
-    ).order_by(AvailabilityCheck.checked_at).all()
+        checks = db.query(AvailabilityCheck).filter(
+            AvailabilityCheck.checked_at >= month_start,
+            AvailabilityCheck.checked_at < reporting_end,
+        ).order_by(AvailabilityCheck.checked_at).all()
 
-    if not checks:
-        return {
-            "year": year,
-            "month": month,
-            "monitoring_started": False,
-            "coverage_complete": False,
-            "availability_percentage": None,
-            "target_percentage": 99.5,
-            "target_met": None,
-            "message": "No monitoring checks were recorded for this month.",
-        }
+        if not checks:
+            return {
+                "year": year,
+                "month": month,
+                "monitoring_started": False,
+                "coverage_complete": False,
+                "availability_percentage": None,
+                "target_percentage": 99.5,
+                "target_met": None,
+                "message": "No monitoring checks were recorded for this month.",
+            }
 
-    first_check = as_utc(checks[0].checked_at)
-    last_check = as_utc(checks[-1].checked_at)
+        first_check = as_utc(checks[0].checked_at)
+        last_check = as_utc(checks[-1].checked_at)
 
-    # Allow one monitoring interval of tolerance at each boundary.
-    tolerance = timedelta(seconds=int(os.getenv("EIMS_MONITOR_INTERVAL_SECONDS", "10")))
+        tolerance = timedelta(
+            seconds=int(os.getenv("EIMS_MONITOR_INTERVAL_SECONDS", "10"))
+        )
 
-    coverage_complete = (
-        first_check <= month_start + tolerance
-        and last_check >= reporting_end - tolerance
-    )
+        coverage_complete = (
+            first_check <= month_start + tolerance
+            and last_check >= reporting_end - tolerance
+        )
 
-    coverage_start = max(first_check, month_start)
-    coverage_end = min(last_check, reporting_end)
+        coverage_start = max(first_check, month_start)
+        coverage_end = min(last_check, reporting_end)
 
-    total_seconds = (coverage_end - coverage_start).total_seconds()
+        total_seconds = (coverage_end - coverage_start).total_seconds()
 
-    if total_seconds <= 0:
-        coverage_complete = False
+        if total_seconds <= 0:
+            coverage_complete = False
 
-    def merge_intervals(intervals):
-        if not intervals:
-            return []
+        def merge_intervals(intervals):
+            if not intervals:
+                return []
 
-        intervals.sort(key=lambda interval: interval[0])
-        merged = [intervals[0]]
+            intervals.sort(key=lambda interval: interval[0])
+            merged = [intervals[0]]
 
-        for start, end in intervals[1:]:
-            previous_start, previous_end = merged[-1]
+            for start, end in intervals[1:]:
+                previous_start, previous_end = merged[-1]
 
-            if start <= previous_end:
-                merged[-1] = (previous_start, max(previous_end, end))
-            else:
-                merged.append((start, end))
-
-        return merged
-
-    maintenance_windows = db.query(MaintenanceWindow).filter(
-        MaintenanceWindow.start_time < coverage_end,
-        MaintenanceWindow.end_time > coverage_start,
-    ).all()
-
-    maintenance_intervals = []
-
-    for window in maintenance_windows:
-        start = max(as_utc(window.start_time), coverage_start)
-        end = min(as_utc(window.end_time), coverage_end)
-
-        if end > start:
-            maintenance_intervals.append((start, end))
-
-    maintenance_intervals = merge_intervals(maintenance_intervals)
-
-    maintenance_seconds = sum(
-        (end - start).total_seconds()
-        for start, end in maintenance_intervals
-    )
-
-    eligible_seconds = total_seconds - maintenance_seconds
-
-    incidents = db.query(DowntimeIncident).filter(
-        DowntimeIncident.started_at < coverage_end,
-        (DowntimeIncident.ended_at.is_(None))
-        | (DowntimeIncident.ended_at > coverage_start),
-    ).all()
-
-    downtime_intervals = []
-
-    for incident in incidents:
-        start = max(as_utc(incident.started_at), coverage_start)
-        incident_end = as_utc(incident.ended_at) if incident.ended_at else now
-        end = min(incident_end, coverage_end)
-
-        if end > start:
-            downtime_intervals.append((start, end))
-
-    downtime_intervals = merge_intervals(downtime_intervals)
-
-    # Exclude scheduled maintenance from downtime.
-    unplanned_intervals = []
-
-    for start, end in downtime_intervals:
-        remaining = [(start, end)]
-
-        for maintenance_start, maintenance_end in maintenance_intervals:
-            updated = []
-
-            for current_start, current_end in remaining:
-                if (
-                    maintenance_end <= current_start
-                    or maintenance_start >= current_end
-                ):
-                    updated.append((current_start, current_end))
+                if start <= previous_end:
+                    merged[-1] = (previous_start, max(previous_end, end))
                 else:
-                    if current_start < maintenance_start:
-                        updated.append((current_start, maintenance_start))
+                    merged.append((start, end))
 
-                    if current_end > maintenance_end:
-                        updated.append((maintenance_end, current_end))
+            return merged
 
-            remaining = updated
+        maintenance_windows = db.query(MaintenanceWindow).filter(
+            MaintenanceWindow.start_time < coverage_end,
+            MaintenanceWindow.end_time > coverage_start,
+        ).all()
 
-        unplanned_intervals.extend(remaining)
+        maintenance_intervals = []
 
-    unplanned_seconds = sum(
-        (end - start).total_seconds()
-        for start, end in unplanned_intervals
-    )
+        for window in maintenance_windows:
+            start = max(as_utc(window.start_time), coverage_start)
+            end = min(as_utc(window.end_time), coverage_end)
 
-    availability_percentage = (
-        (eligible_seconds - unplanned_seconds) / eligible_seconds * 100
-        if eligible_seconds > 0
-        else None
-    )
+            if end > start:
+                maintenance_intervals.append((start, end))
 
-    # Only evaluate the target when the monitoring period is complete.
-    target_met = (
-        availability_percentage >= 99.5
-        if coverage_complete and availability_percentage is not None
-        else None
-    )
+        maintenance_intervals = merge_intervals(maintenance_intervals)
 
-    return {
-        "year": year,
-        "month": month,
-        "monitoring_started": True,
-        "coverage_start": coverage_start.isoformat(),
-        "coverage_end": coverage_end.isoformat(),
-        "coverage_complete": coverage_complete,
-        "total_seconds": round(total_seconds, 2),
-        "scheduled_maintenance_seconds": round(maintenance_seconds, 2),
-        "eligible_seconds": round(eligible_seconds, 2),
-        "unplanned_downtime_seconds": round(unplanned_seconds, 2),
-        "availability_percentage": (
-            round(availability_percentage, 4)
-            if availability_percentage is not None
+        maintenance_seconds = sum(
+            (end - start).total_seconds()
+            for start, end in maintenance_intervals
+        )
+
+        eligible_seconds = total_seconds - maintenance_seconds
+
+        incidents = db.query(DowntimeIncident).filter(
+            DowntimeIncident.started_at < coverage_end,
+            (DowntimeIncident.ended_at.is_(None))
+            | (DowntimeIncident.ended_at > coverage_start),
+        ).all()
+
+        downtime_intervals = []
+
+        for incident in incidents:
+            start = max(as_utc(incident.started_at), coverage_start)
+            incident_end = (
+                as_utc(incident.ended_at) if incident.ended_at else now
+            )
+            end = min(incident_end, coverage_end)
+
+            if end > start:
+                downtime_intervals.append((start, end))
+
+        downtime_intervals = merge_intervals(downtime_intervals)
+
+        # Exclude scheduled maintenance from downtime.
+        unplanned_intervals = []
+
+        for start, end in downtime_intervals:
+            remaining = [(start, end)]
+
+            for maintenance_start, maintenance_end in maintenance_intervals:
+                updated = []
+
+                for current_start, current_end in remaining:
+                    if (
+                        maintenance_end <= current_start
+                        or maintenance_start >= current_end
+                    ):
+                        updated.append((current_start, current_end))
+                    else:
+                        if current_start < maintenance_start:
+                            updated.append((current_start, maintenance_start))
+
+                        if current_end > maintenance_end:
+                            updated.append((maintenance_end, current_end))
+
+                remaining = updated
+
+            unplanned_intervals.extend(remaining)
+
+        unplanned_seconds = sum(
+            (end - start).total_seconds()
+            for start, end in unplanned_intervals
+        )
+
+        availability_percentage = (
+            (eligible_seconds - unplanned_seconds) / eligible_seconds * 100
+            if eligible_seconds > 0
             else None
-        ),
-        "target_percentage": 99.5,
-        "target_met": target_met,
-        "message": (
-            "Monthly target evaluated."
-            if coverage_complete
-            else "Monitoring coverage is incomplete. The monthly target cannot be evaluated reliably."
-        ),
-    }
+        )
 
+        target_met = (
+            availability_percentage >= 99.5
+            if coverage_complete and availability_percentage is not None
+            else None
+        )
 
+        return {
+            "year": year,
+            "month": month,
+            "monitoring_started": True,
+            "coverage_start": coverage_start.isoformat(),
+            "coverage_end": coverage_end.isoformat(),
+            "coverage_complete": coverage_complete,
+            "total_seconds": round(total_seconds, 2),
+            "scheduled_maintenance_seconds": round(maintenance_seconds, 2),
+            "eligible_seconds": round(eligible_seconds, 2),
+            "unplanned_downtime_seconds": round(unplanned_seconds, 2),
+            "availability_percentage": (
+                round(availability_percentage, 4)
+                if availability_percentage is not None
+                else None
+            ),
+            "target_percentage": 99.5,
+            "target_met": target_met,
+            "message": (
+                "Monthly target evaluated."
+                if coverage_complete
+                else "Monitoring coverage is incomplete. The monthly target cannot be evaluated reliably."
+            ),
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Unexpected error while generating system availability report"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to generate the system availability report due to an unexpected error.",
+        )
 
 @app.get("/api/dashboard", response_model=DashboardResponse)
 def dashboard(
