@@ -1634,37 +1634,6 @@ cursor: not-allowed;
   margin: 14px 0 0;
 }
 
-/* Dark appearance follows the device's color preference. */
-@media (prefers-color-scheme: dark) {
-  #form-card {
-    --text: #e5e7eb;
-    --muted: #a1a1aa;
-    --surface: #1f2937;
-    --border: #374151;
-    color: #e5e7eb;
-    background: #1f2937;
-  }
-
-  #form-card h2,
-  #form-card .add-component-form label {
-    color: #f3f4f6;
-  }
-
-  #form-card .add-component-form input {
-    color: #f3f4f6;
-    background: #111827;
-    border-color: #4b5563;
-  }
-
-  #form-card .add-component-form input::placeholder {
-    color: #9ca3af;
-  }
-
-  #form-card .add-component-form .field-help {
-    color: #a1a1aa;
-  }
-}
-
 @media (max-width: 900px) {
   .add-component-form {
     column-gap: 18px;
@@ -1694,5 +1663,290 @@ cursor: not-allowed;
 
   .form-heading > button {
     min-width: 90px;
+  }
+}
+
+.supplier-form {
+  display: grid;
+  gap: 8px;
+  max-width: 620px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.supplier-form-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.supplier-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.supplier-list li:not(.empty-state) {
+  padding: 10px 12px;
+  color: var(--text);
+  background: #f8faff;
+  border: 1px solid #e4e9f3;
+  border-radius: 9px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+#supplier-card h3 {
+  margin: 22px 0 10px;
+  color: var(--text);
+  font-size: 15px;
+}
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --text: #e5e7eb;
+  --muted: #aab4c3;
+  --border: #374151;
+  --surface: #1f2937;
+  --primary: #3157d5;
+  --primary-hover: #2546b7;
+}
+
+html[data-theme="dark"] body {
+  color: var(--text);
+  background:
+    radial-gradient(ellipse at 10% 0, rgba(49, 67, 110, 0.35), transparent 34rem),
+    #111827;
+}
+
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] .dialog-heading h2,
+html[data-theme="dark"] .chart-card h3,
+html[data-theme="dark"] .detail-item dd,
+html[data-theme="dark"] .stat b,
+html[data-theme="dark"] td:nth-child(2) {
+  color: #f3f4f6;
+}
+
+html[data-theme="dark"] .eyebrow {
+  color: #a5b4fc;
+}
+
+html[data-theme="dark"] .brand-copy strong,
+html[data-theme="dark"] .workspace-label,
+html[data-theme="dark"] .dashboard-role,
+html[data-theme="dark"] .read-only-label,
+html[data-theme="dark"] .filter-panel summary,
+html[data-theme="dark"] .filter-grid label,
+html[data-theme="dark"] .grid label,
+html[data-theme="dark"] .availability-report .filter-actions label,
+html[data-theme="dark"] .component-edit-form label,
+html[data-theme="dark"] .chart-label,
+html[data-theme="dark"] .chart-value,
+html[data-theme="dark"] th,
+html[data-theme="dark"] td,
+html[data-theme="dark"] .component-link {
+  color: #cbd5e1;
+}
+
+html[data-theme="dark"] .brand-mark {
+  background: #26334b;
+  border-color: #3b4e70;
+}
+
+html[data-theme="dark"] .live-indicator {
+  color: #a7f3d0;
+  background: #173a2c;
+  border-color: #285d46;
+}
+
+html[data-theme="dark"] .card,
+html[data-theme="dark"] .inventory-controls,
+html[data-theme="dark"] .table-card,
+html[data-theme="dark"] .recent-components,
+html[data-theme="dark"] .dashboard-charts,
+html[data-theme="dark"] .stat,
+html[data-theme="dark"] .component-dialog {
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] .search-box,
+html[data-theme="dark"] .secondary-button,
+html[data-theme="dark"] .text-button {
+  color: var(--text);
+  background-color: #111827;
+  border-color: #4b5563;
+}
+
+html[data-theme="dark"] input::placeholder {
+  color: #9ca3af;
+}
+
+html[data-theme="dark"] select option {
+  color: var(--text);
+  background: #111827;
+}
+
+html[data-theme="dark"] .secondary-button:hover,
+html[data-theme="dark"] .text-button:hover {
+  color: #fff;
+  background: #29364a;
+  border-color: #64748b;
+}
+
+html[data-theme="dark"] .filter-panel,
+html[data-theme="dark"] .table-container,
+html[data-theme="dark"] th,
+html[data-theme="dark"] td,
+html[data-theme="dark"] .add-component-form .form-actions {
+  border-color: #374151;
+}
+
+html[data-theme="dark"] .recent-component,
+html[data-theme="dark"] .chart-card,
+html[data-theme="dark"] .detail-item,
+html[data-theme="dark"] .details-message,
+html[data-theme="dark"] .component-detail-category,
+html[data-theme="dark"] .supplier-list li:not(.empty-state) {
+  color: var(--text);
+  background: #111827;
+  border-color: #374151;
+}
+
+html[data-theme="dark"] .recent-component:hover {
+  color: #c7d2fe;
+  background: #1d2b45;
+  border-color: #5269a6;
+}
+
+html[data-theme="dark"] .component-link:hover {
+  color: #c7d2fe;
+}
+
+html[data-theme="dark"] .quick-start {
+  color: #dbeafe;
+  background: #1b2942;
+  border-color: #34476c;
+}
+
+html[data-theme="dark"] .quick-start h2,
+html[data-theme="dark"] .quick-start p:last-child {
+  color: #dbeafe;
+}
+
+html[data-theme="dark"] .low-stock-alert {
+  color: #fde68a;
+  background: #3a2b14;
+  border-color: #80622c;
+}
+
+html[data-theme="dark"] .low-stock-alert .alert-copy h2,
+html[data-theme="dark"] .low-stock-alert-item,
+html[data-theme="dark"] .low-stock-alert-item span,
+html[data-theme="dark"] .low-stock-alert .secondary-button {
+  color: #fde68a;
+}
+
+html[data-theme="dark"] .low-stock-alert-item,
+html[data-theme="dark"] .low-stock-alert .secondary-button {
+  background: #2d2416;
+  border-color: #80622c;
+}
+
+html[data-theme="dark"] .low-stock-alert-item:hover,
+html[data-theme="dark"] .low-stock-alert .secondary-button:hover {
+  color: #fff1c2;
+  background: #493718;
+  border-color: #a17b36;
+}
+
+html[data-theme="dark"] thead,
+html[data-theme="dark"] tbody tr:hover {
+  background: #172033;
+}
+
+html[data-theme="dark"] tbody tr.stock-row-low-stock {
+  background: #342915;
+}
+
+html[data-theme="dark"] tbody tr.stock-row-low-stock:hover {
+  background: #45351a;
+}
+
+html[data-theme="dark"] tbody tr.stock-row-out-of-stock {
+  background: #351f21;
+}
+
+html[data-theme="dark"] .status-in-stock {
+  color: #a7f3d0;
+  background: #174536;
+}
+
+html[data-theme="dark"] .status-low-stock {
+  color: #fde68a;
+  background: #4a3517;
+}
+
+html[data-theme="dark"] .status-out-of-stock {
+  color: #fecaca;
+  background: #4a2528;
+}
+
+html[data-theme="dark"] .results-count,
+html[data-theme="dark"] .dashboard-role {
+  color: #cbd5e1;
+  background: #273449;
+  border-color: #3c4b60;
+}
+
+html[data-theme="dark"] .chart-track {
+  background: #374151;
+}
+
+html[data-theme="dark"] .stat-icon {
+  color: #c7d2fe;
+  background: #293b67;
+}
+
+html[data-theme="dark"] .stat:nth-child(2) .stat-icon {
+  color: #a7f3d0;
+  background: #174536;
+}
+
+html[data-theme="dark"] .stat:nth-child(3) .stat-icon {
+  color: #fde68a;
+  background: #4a3517;
+}
+
+html[data-theme="dark"] .details-error {
+  color: #fecaca;
+  background: #3b2022;
+}
+
+html[data-theme="dark"] .form-feedback {
+  color: #bbf7d0;
+  background: #173a2c;
+  border-color: #285d46;
+}
+
+html[data-theme="dark"] .error,
+html[data-theme="dark"] .field-error,
+html[data-theme="dark"] .required-indicator {
+  color: #fca5a5;
+}
+
+@media (max-width: 600px) {
+  .supplier-form-row {
+    align-items: stretch;
+    flex-direction: column;
   }
 }

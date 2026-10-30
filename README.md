@@ -30,6 +30,7 @@ The application also includes monthly system availability reporting based on mon
 * Filter inventory by category, supplier, and stock status.
 * Sort inventory using supported fields and sort orders.
 * Add new components with input validation.
+* Add and view suppliers; supplier choices are shared with component forms and inventory filters.
 * Generate unique SKUs for inventory components.
 * Update component quantity, unit price, supplier, and reorder level.
 * Delete components with appropriate authorization and UI confirmation.
@@ -46,6 +47,7 @@ The application also includes monthly system availability reporting based on mon
 * Display low-stock information.
 * Provide recently added component information.
 * Visualize inventory summaries and trends where supported by available data.
+* Switch between persistent light and dark themes across the application.
 
 ### 4. Stock Availability Reporting
 

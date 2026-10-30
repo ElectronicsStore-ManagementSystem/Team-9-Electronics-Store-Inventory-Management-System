@@ -3,6 +3,29 @@ let role = localStorage.getItem('eims_role');
 
 const $ = id => document.getElementById(id);
 
+function applyTheme(theme) {
+  const isDark = theme === 'dark';
+  document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+  $('theme-toggle').textContent = isDark ? 'Light mode' : 'Dark mode';
+  $('theme-toggle').setAttribute('aria-pressed', String(isDark));
+  $('theme-toggle').setAttribute(
+    'aria-label',
+    `Switch to ${isDark ? 'light' : 'dark'} mode`
+  );
+  localStorage.setItem('eims_theme', isDark ? 'dark' : 'light');
+}
+
+const savedTheme = localStorage.getItem('eims_theme');
+const initialTheme = savedTheme === 'dark' || savedTheme === 'light'
+  ? savedTheme
+  : window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light';
+applyTheme(initialTheme);
+$('theme-toggle').onclick = () => {
+  applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+};
+
 // ==================== AVAILABILITY REPORT EXPORTS ====================
 
 async function exportAvailabilityReport(format) {
