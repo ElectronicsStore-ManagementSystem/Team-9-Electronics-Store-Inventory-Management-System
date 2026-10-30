@@ -30,6 +30,12 @@ from .models import (
     DowntimeIncident,
     MaintenanceWindow,
     User,
+    PurchaseOrder,
+   PurchaseOrderItem,
+   PurchaseOrderReceipt,
+   Supplier,
+   Component,
+   StockMovement,
 )
 from .schemas import (
     BranchCreate,
@@ -45,6 +51,11 @@ from .schemas import (
     SupplierResponse,
     StockMovementCreate,
     StockMovementResponse,
+    PurchaseOrderCreate,
+    PurchaseOrderResponse,
+    PurchaseOrderStatusUpdate,
+    PurchaseOrderReceive,
+    PurchaseOrderReceiptResponse,
 )
 from .security import create_access_token, get_current_user, require_admin, require_manager, verify_password
 from .services import stock_status, validate_search
@@ -965,3 +976,341 @@ def dashboard(
 def audit_logs(db: Session = Depends(get_db), user: User = Depends(require_manager)):
     rows = repositories.list_audit_logs(db)
     return [{"id": r.id, "user_id": r.user_id, "action": r.action, "component_id": r.component_id, "component_name": r.component_name, "details": r.details, "timestamp": r.timestamp} for r in rows]
+
+
+# ---------------- PURCHASE ORDER APIs ----------------
+
+@app.post(
+    "/api/purchase-orders",
+    response_model=PurchaseOrderResponse,
+    status_code=201,
+)
+def create_purchase_order(
+    payload: PurchaseOrderCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_manager),
+):
+    supplier = db.get(Supplier, payload.supplier_id)
+
+    if supplier is None:
+        raise HTTPException(status_code=404, detail="Supplier not found")
+
+    component_ids = [item.component_id for item in payload.items]
+
+    if len(component_ids) != len(set(component_ids)):
+        raise HTTPException(
+            status_code=422,
+            detail="Duplicate components are not allowed in one purchase order",
+        )
+
+    items = []
+
+    for item in payload.items:
+        component = repositories.get_active_component(db, item.component_id)
+
+        if component is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Component {item.component_id} not found or inactive",
+            )
+
+        items.append({
+            "component_id": component.id,
+            "ordered_quantity": item.ordered_quantity,
+        })
+
+    try:
+        order = repositories.create_purchase_order(
+            db, supplier, user, items
+        )
+        db.commit()
+        db.refresh(order)
+
+        return {
+            "id": order.id,
+            "order_number": order.order_number,
+            "supplier_id": order.supplier_id,
+            "status": order.status,
+            "order_date": order.order_date,
+            "created_by": order.created_by,
+            "items": order.items,
+        }
+
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Purchase order creation failed",
+        ) from exc
+
+
+@app.get(
+    "/api/purchase-orders",
+    response_model=list[PurchaseOrderResponse],
+)
+def get_purchase_orders(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return repositories.list_purchase_orders(db)
+
+
+@app.get(
+    "/api/purchase-orders/{purchase_order_id}",
+    response_model=PurchaseOrderResponse,
+)
+def get_purchase_order(
+    purchase_order_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    order = repositories.get_purchase_order(db, purchase_order_id)
+
+    if order is None:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+
+    return order
+
+
+@app.patch("/api/purchase-orders/{purchase_order_id}/status")
+def update_purchase_order_status(
+    purchase_order_id: int,
+    payload: PurchaseOrderStatusUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_manager),
+):
+    order = repositories.get_purchase_order(db, purchase_order_id)
+
+    if order is None:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+
+    if order.status in {"RECEIVED", "CANCELLED"}:
+        raise HTTPException(
+            status_code=409,
+            detail="This purchase order can no longer be modified",
+        )
+
+    if payload.status == "CANCELLED" and any(
+        item.received_quantity > 0 for item in order.items
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="An order with received items cannot be cancelled",
+        )
+
+    if payload.status == "DRAFT" and order.status != "DRAFT":
+        raise HTTPException(
+            status_code=409,
+            detail="An ordered purchase order cannot be moved back to draft",
+        )
+
+    try:
+        order = repositories.update_purchase_order_status(
+            db, order, payload.status
+        )
+        db.commit()
+        db.refresh(order)
+        return order
+
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Purchase order status update failed",
+        ) from exc
+
+@app.post(
+    "/api/purchase-orders/{purchase_order_id}/receive",
+    response_model=list[PurchaseOrderReceiptResponse],
+)
+def receive_purchase_order(
+    purchase_order_id: int,
+    payload: PurchaseOrderReceive,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_manager),
+):
+    try:
+        # Lock the purchase order during receiving.
+        order = (
+            db.query(PurchaseOrder)
+            .filter(PurchaseOrder.id == purchase_order_id)
+            .with_for_update()
+            .first()
+        )
+
+        if order is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Purchase order not found",
+            )
+
+        if order.status in {"DRAFT", "CANCELLED", "RECEIVED"}:
+            raise HTTPException(
+                status_code=409,
+                detail="This purchase order cannot receive additional stock",
+            )
+
+        # Check whether this receiving request was already processed.
+        existing_receipt = db.query(PurchaseOrderReceipt).filter(
+            PurchaseOrderReceipt.idempotency_key.like(
+                f"{payload.idempotency_key}:%"
+            )
+        ).first()
+
+        if existing_receipt:
+            raise HTTPException(
+                status_code=409,
+                detail="This receiving request has already been processed",
+            )
+
+        item_ids = [
+            item.purchase_order_item_id
+            for item in payload.items
+        ]
+
+        if len(item_ids) != len(set(item_ids)):
+            raise HTTPException(
+                status_code=422,
+                detail="Duplicate order items in receiving request",
+            )
+
+        # Validate every item before changing inventory.
+        validated_items = []
+
+        for received_item in payload.items:
+            order_item = (
+                db.query(PurchaseOrderItem)
+                .filter(
+                    PurchaseOrderItem.id
+                    == received_item.purchase_order_item_id,
+                    PurchaseOrderItem.purchase_order_id == order.id,
+                )
+                .with_for_update()
+                .first()
+            )
+
+            if order_item is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Purchase order item not found",
+                )
+
+            outstanding = (
+                order_item.ordered_quantity
+                - order_item.received_quantity
+            )
+
+            if received_item.received_quantity > outstanding:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Received quantity exceeds outstanding quantity",
+                )
+
+            component = (
+                db.query(Component)
+                .filter(Component.id == order_item.component_id)
+                .with_for_update()
+                .first()
+            )
+
+            if component is None or not component.active:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Component not found or inactive",
+                )
+
+            validated_items.append(
+                (order_item, component, received_item.received_quantity)
+            )
+
+        receipts = []
+
+        # Apply all inventory changes in the same transaction.
+        for order_item, component, quantity in validated_items:
+
+            order_item.received_quantity += quantity
+            component.quantity += quantity
+
+            # Record receiving history with a unique key per order item.
+            receipt_key = (
+                f"{payload.idempotency_key}:"
+                f"{order.id}:"
+                f"{order_item.id}"
+            )
+
+            receipt = repositories.create_purchase_order_receipt(
+                db,
+                order_item,
+                quantity,
+                user,
+                receipt_key,
+            )
+
+            receipts.append(receipt)
+
+            # Record the inventory movement.
+            db.add(
+                StockMovement(
+                    component_id=component.id,
+                    component_name=component.name,
+                    movement_type="STOCK_IN",
+                    quantity=quantity,
+                    reason=f"Purchase order {order.order_number} received",
+                    user_id=user.id,
+                )
+            )
+
+        # Calculate order status from actual received quantities.
+        db.flush()
+
+        if all(
+            item.received_quantity == item.ordered_quantity
+            for item in order.items
+        ):
+            order.status = "RECEIVED"
+        else:
+            order.status = "PARTIALLY_RECEIVED"
+
+        db.commit()
+
+        for receipt in receipts:
+            db.refresh(receipt)
+
+        return receipts
+
+    except HTTPException:
+            db.rollback()
+            raise
+
+    except IntegrityError as exc:
+            db.rollback()
+            raise HTTPException(
+                status_code=409,
+                detail="This receiving request has already been processed",
+            ) from exc
+
+    except Exception:
+       db.rollback()
+    raise HTTPException(
+        status_code=500,
+        detail="Purchase order receiving failed",
+    )
+
+
+@app.get(
+    "/api/purchase-orders/{purchase_order_id}/receipts",
+    response_model=list[PurchaseOrderReceiptResponse],
+)
+def get_purchase_order_receipts(
+    purchase_order_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    order = repositories.get_purchase_order(db, purchase_order_id)
+
+    if order is None:
+        raise HTTPException(status_code=404, detail="Purchase order not found")
+
+    return repositories.list_purchase_order_receipts(
+        db, purchase_order_id
+    )

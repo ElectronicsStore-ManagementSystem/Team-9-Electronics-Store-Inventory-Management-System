@@ -1,9 +1,10 @@
 from collections.abc import Sequence
+import uuid
 
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
-from .models import AuditLog, Branch, Component, StockMovement, Supplier, User
+from .models import AuditLog, Branch, Component, StockMovement, Supplier, User ,PurchaseOrder,PurchaseOrderItem,PurchaseOrderReceipt
 
 def find_user_by_username(db: Session, username: str) -> User | None:
     return db.scalar(select(User).where(User.username == username))
@@ -350,4 +351,109 @@ def list_stock_movements(
             .where(StockMovement.component_id == component_id)
             .order_by(StockMovement.timestamp.desc(), StockMovement.id.desc())
         )
+    )
+
+
+# ---------------- PURCHASE ORDER REPOSITORIES ----------------
+
+def create_purchase_order(
+    db: Session,
+    supplier: Supplier,
+    user: User,
+    items: list[dict],
+) -> PurchaseOrder:
+
+    order_number = f"PO-{uuid.uuid4().hex[:12].upper()}"
+
+    purchase_order = PurchaseOrder(
+        order_number=order_number,
+        supplier_id=supplier.id,
+        status="DRAFT",
+        created_by=user.id,
+    )
+
+    db.add(purchase_order)
+    db.flush()
+
+    for item in items:
+        db.add(
+            PurchaseOrderItem(
+                purchase_order_id=purchase_order.id,
+                component_id=item["component_id"],
+                ordered_quantity=item["ordered_quantity"],
+                received_quantity=0,
+            )
+        )
+
+    db.flush()
+    return purchase_order
+
+
+def get_purchase_order(
+    db: Session,
+    purchase_order_id: int,
+) -> PurchaseOrder | None:
+
+    return db.get(PurchaseOrder, purchase_order_id)
+
+
+def list_purchase_orders(
+    db: Session,
+) -> list[PurchaseOrder]:
+
+    return list(
+        db.query(PurchaseOrder)
+        .order_by(PurchaseOrder.order_date.desc())
+        .all()
+    )
+
+
+def update_purchase_order_status(
+    db: Session,
+    purchase_order: PurchaseOrder,
+    status: str,
+) -> PurchaseOrder:
+
+    purchase_order.status = status
+    db.flush()
+    return purchase_order
+
+
+def create_purchase_order_receipt(
+    db: Session,
+    purchase_order_item: PurchaseOrderItem,
+    quantity: int,
+    user: User,
+    idempotency_key: str,
+) -> PurchaseOrderReceipt:
+
+    receipt = PurchaseOrderReceipt(
+        purchase_order_item_id=purchase_order_item.id,
+        received_quantity=quantity,
+        received_by=user.id,
+        idempotency_key=idempotency_key,
+    )
+
+    db.add(receipt)
+    db.flush()
+    return receipt
+
+
+def list_purchase_order_receipts(
+    db: Session,
+    purchase_order_id: int,
+) -> list[PurchaseOrderReceipt]:
+
+    return list(
+        db.query(PurchaseOrderReceipt)
+        .join(
+            PurchaseOrderItem,
+            PurchaseOrderReceipt.purchase_order_item_id
+            == PurchaseOrderItem.id,
+        )
+        .filter(
+            PurchaseOrderItem.purchase_order_id == purchase_order_id
+        )
+        .order_by(PurchaseOrderReceipt.received_at.desc())
+        .all()
     )
