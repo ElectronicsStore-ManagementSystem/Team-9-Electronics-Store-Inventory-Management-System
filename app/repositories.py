@@ -3,8 +3,7 @@ from collections.abc import Sequence
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
-from .models import AuditLog, Branch, Component, Supplier, User
-
+from .models import AuditLog, Branch, Component, StockMovement, Supplier, User
 
 def find_user_by_username(db: Session, username: str) -> User | None:
     return db.scalar(select(User).where(User.username == username))
@@ -319,3 +318,36 @@ def get_dashboard_summary(db: Session) -> dict:
             for date, quantity, count in trend_rows
         ],
     }
+
+def create_stock_movement(
+    db: Session,
+    component: Component,
+    user: User,
+    movement_type: str,
+    quantity: int,
+    reason: str,
+) -> StockMovement:
+    movement = StockMovement(
+        component_id=component.id,
+        component_name=component.name,
+        movement_type=movement_type,
+        quantity=quantity,
+        reason=reason,
+        user_id=user.id,
+    )
+
+    db.add(movement)
+    return movement
+
+
+def list_stock_movements(
+    db: Session,
+    component_id: int,
+) -> list[StockMovement]:
+    return list(
+        db.scalars(
+            select(StockMovement)
+            .where(StockMovement.component_id == component_id)
+            .order_by(StockMovement.timestamp.desc(), StockMovement.id.desc())
+        )
+    )

@@ -457,10 +457,22 @@ def test_authorized_manager_can_update_all_editable_component_fields(
     assert manager_login.status_code == 200
     manager_headers = auth(manager_login.json()["access_token"])
 
+    # Quantity changes must be recorded through the stock movement API.
+    stock_update = client.post(
+        f"/api/inventory/{component_id}/movements",
+        json={
+            "movement_type": "STOCK_IN",
+            "quantity": 9,
+            "reason": "Manager update test",
+        },
+        headers=manager_headers,
+    )
+    assert stock_update.status_code == 201
+
+    # PATCH is reserved for non-stock component fields.
     updated = client.patch(
         f"/api/inventory/{component_id}",
         json={
-            "quantity": 12,
             "unit_price": 14.75,
             "supplier": "  New Supplier  ",
             "reorder_level": 4,
@@ -493,7 +505,6 @@ def test_authorized_manager_can_update_all_editable_component_fields(
         assert item["unit_price"] == 14.75
         assert item["supplier"] == "New Supplier"
         assert item["reorder_level"] == 4
-
 
 def test_staff_cannot_update_component(client, admin_token, staff_token):
     headers = auth(admin_token)
@@ -573,13 +584,24 @@ def test_admin_can_add_update_delete_and_audit(client, admin_token):
     item = created.json()
     assert item["sku"].startswith("EIMS-")
 
-    updated = client.patch(
-        f"/api/inventory/{item['id']}",
-        json={"quantity": 2},
+    # Record the stock reduction instead of updating quantity through PATCH.
+    updated = client.post(
+        f"/api/inventory/{item['id']}/movements",
+        json={
+            "movement_type": "STOCK_OUT",
+            "quantity": 1,
+            "reason": "Admin update test",
+        },
         headers=h,
     )
-    assert updated.status_code == 200
-    assert updated.json()["quantity"] == 2
+    assert updated.status_code == 201
+
+    component_after_update = client.get(
+        f"/api/inventory/{item['id']}",
+        headers=h,
+    )
+    assert component_after_update.status_code == 200
+    assert component_after_update.json()["quantity"] == 2
 
     deleted = client.delete(
         f"/api/inventory/{item['id']}",
@@ -602,8 +624,6 @@ def test_admin_can_add_update_delete_and_audit(client, admin_token):
     assert audit_log["action"] == "DELETE_COMPONENT"
     assert audit_log["component_name"] == item["name"]
     assert audit_log["timestamp"] is not None
-
-
 
 def test_duplicate_sku_is_impossible_through_create(client, admin_token):
     h = auth(admin_token)
@@ -729,12 +749,17 @@ def test_dashboard_low_stock_alert_data_updates_after_quantity_change(
     before = client.get("/api/dashboard", headers=staff_headers).json()
     assert before["low_stock_count"] == 1
 
-    updated = client.patch(
-        "/api/inventory/1",
-        json={"quantity": 4},
+    # Arduino Uno starts with 18 units; stock out 14 to leave 4.
+    updated = client.post(
+        "/api/inventory/1/movements",
+        json={
+            "movement_type": "STOCK_OUT",
+            "quantity": 14,
+            "reason": "Dashboard low-stock alert test",
+        },
         headers=admin_headers,
     )
-    assert updated.status_code == 200
+    assert updated.status_code == 201
 
     after = client.get("/api/dashboard", headers=staff_headers).json()
     assert after["low_stock_count"] == 2
@@ -742,7 +767,6 @@ def test_dashboard_low_stock_alert_data_updates_after_quantity_change(
         "Arduino Uno",
         "ESP32 Dev Board",
     }
-
 
 def test_deleted_sku_is_not_reused(client, admin_token):
     headers = auth(admin_token)
@@ -800,18 +824,30 @@ def test_sku_is_preserved_after_component_update(client, admin_token):
     )
 
     assert created.status_code == 201
+    component_id = created.json()["id"]
     original_sku = created.json()["sku"]
 
-    updated = client.patch(
-        f"/api/inventory/{created.json()['id']}",
-        json={"quantity": 10},
+    # Increase stock through a movement so the change is recorded in history.
+    updated = client.post(
+        f"/api/inventory/{component_id}/movements",
+        json={
+            "movement_type": "STOCK_IN",
+            "quantity": 5,
+            "reason": "SKU preservation test",
+        },
         headers=headers,
     )
 
-    assert updated.status_code == 200
-    assert updated.json()["sku"] == original_sku
-    assert updated.json()["quantity"] == 10
+    assert updated.status_code == 201
 
+    component_after_update = client.get(
+        f"/api/inventory/{component_id}",
+        headers=headers,
+    )
+
+    assert component_after_update.status_code == 200
+    assert component_after_update.json()["sku"] == original_sku
+    assert component_after_update.json()["quantity"] == 10
 
 def test_sku_is_returned_in_inventory_list(client, admin_token):
     headers = auth(admin_token)

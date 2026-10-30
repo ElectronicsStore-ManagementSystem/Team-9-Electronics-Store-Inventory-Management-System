@@ -97,7 +97,8 @@ class ComponentCreate(BaseModel):
 
     
 class ComponentUpdate(BaseModel):
-    quantity: int | None = Field(default=None, ge=0)
+    model_config = ConfigDict(extra="forbid")
+
     unit_price: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     supplier: str | None = Field(default=None, min_length=1, max_length=120)
     branch: str | None = Field(default=None, min_length=1, max_length=120)
@@ -159,3 +160,41 @@ class DashboardResponse(BaseModel):
     recently_added: list[ComponentResponse]
     category_stock: list[CategoryStockSummary]
     stock_trend: list[StockTrendPoint]
+
+class StockMovementCreate(BaseModel):
+    movement_type: str = Field(
+        pattern="^(STOCK_IN|STOCK_OUT)$",
+    )
+
+    quantity: int = Field(
+        gt=0,
+        description="Movement quantity must be greater than zero",
+    )
+
+    reason: str = Field(
+        min_length=1,
+        max_length=500,
+    )
+
+    @field_validator("reason")
+    @classmethod
+    def validate_reason(cls, value: str) -> str:
+        value = value.strip()
+
+        if not value:
+            raise ValueError("Reason cannot be blank")
+
+        return value
+
+
+class StockMovementResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    component_id: int
+    component_name: str
+    movement_type: str
+    quantity: int
+    reason: str
+    timestamp: datetime
+    user_id: int
