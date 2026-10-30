@@ -10,7 +10,6 @@
 4. Karan Maheshwari   --PES2UG24CS216
 
 
-
 EIMS is a web-based inventory management system designed for an electronics store. It provides inventory management, authentication, role-based access control, stock availability reporting, dashboard summaries, input validation, and automated testing.
 
 The application also includes monthly system availability reporting based on monitoring checks, downtime incidents, and scheduled maintenance.
@@ -28,11 +27,13 @@ The application also includes monthly system availability reporting based on mon
 
 * List and view inventory components.
 * Search components by supported fields.
-* Filter inventory by category, supplier, and stock status.
+* Filter inventory by category, supplier, branch, and stock status.
 * Sort inventory using supported fields and sort orders.
 * Add new components with input validation.
+* Manage shop branches and assign each component to one branch.
+* Keep supplier/vendor details for components; supplier choices are shared with forms and filters.
 * Generate unique SKUs for inventory components.
-* Update component quantity, unit price, supplier, and reorder level.
+* Update component quantity, unit price, supplier, branch, and reorder level.
 * Delete components with appropriate authorization and UI confirmation.
 * Classify inventory stock into:
 
@@ -47,6 +48,7 @@ The application also includes monthly system availability reporting based on mon
 * Display low-stock information.
 * Provide recently added component information.
 * Visualize inventory summaries and trends where supported by available data.
+* Switch between persistent light and dark themes across the application.
 
 ### 4. Stock Availability Reporting
 

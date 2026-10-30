@@ -3,6 +3,7 @@ from sqlalchemy import inspect, text
 from .db import Base, SessionLocal, engine
 from .models import (
     AvailabilityCheck,
+    Branch,
     Component,
     DowntimeIncident,
     MaintenanceWindow,
@@ -13,6 +14,12 @@ from .security import hash_password
 def seed_demo_data() -> None:
     db = SessionLocal()
     try:
+        if not db.query(Branch).filter_by(
+            normalized_name="main branch"
+        ).first():
+            db.add(Branch(name="Main Branch", normalized_name="main branch"))
+            db.commit()
+
         if find_user_by_username(db, "admin"):
             return
         users = [
@@ -64,6 +71,21 @@ def seed_demo_data() -> None:
 def initialize_database() -> None:
     Base.metadata.create_all(bind=engine)
 
+    component_columns = {
+        column["name"]
+        for column in inspect(engine).get_columns("components")
+    }
+
+    if "branch" not in component_columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "ALTER TABLE components "
+                    "ADD COLUMN branch VARCHAR(120) NOT NULL "
+                    "DEFAULT 'Main Branch'"
+                )
+            )
+
     columns = {
         column["name"]
         for column in inspect(engine).get_columns("users")
@@ -74,5 +96,16 @@ def initialize_database() -> None:
             connection.execute(
                 text("ALTER TABLE users ADD COLUMN last_activity DATETIME")
             )
+
+    db = SessionLocal()
+    try:
+        default_branch = db.query(Branch).filter_by(
+            normalized_name="main branch"
+        ).first()
+        if default_branch is None:
+            db.add(Branch(name="Main Branch", normalized_name="main branch"))
+            db.commit()
+    finally:
+        db.close()
 
     seed_demo_data()

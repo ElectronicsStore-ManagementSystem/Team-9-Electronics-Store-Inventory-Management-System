@@ -3,8 +3,7 @@ from collections.abc import Sequence
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
-from .models import AuditLog, Component, StockMovement, User
-
+from .models import AuditLog, Branch, Component, StockMovement, Supplier, User
 
 def find_user_by_username(db: Session, username: str) -> User | None:
     return db.scalar(select(User).where(User.username == username))
@@ -27,6 +26,7 @@ def list_components(
     search: str | None = None,
     category: str | None = None,
     supplier: str | None = None,
+    branch: str | None = None,
     status: str | None = None,
     sort: str = "id",
     allow_date_sort: bool = False,
@@ -55,17 +55,27 @@ def list_components(
     query = select(Component).where(Component.active.is_(True))
     if search:
         term = f"%{search}%"
-        query = query.where(
-            or_(
-                Component.name.ilike(term),
-                Component.sku.ilike(term),
-                Component.category.ilike(term),
+        search_conditions = [
+            Component.name.ilike(term),
+            Component.sku.ilike(term),
+            Component.category.ilike(term),
+        ]
+        category_aliases = {
+            "microprocessor": "microcontroller",
+            "microprocessors": "microcontroller",
+        }
+        category_alias = category_aliases.get(search.casefold())
+        if category_alias:
+            search_conditions.append(
+                Component.category.ilike(f"%{category_alias}%")
             )
-        )
+        query = query.where(or_(*search_conditions))
     if category:
         query = query.where(Component.category == category)
     if supplier:
         query = query.where(Component.supplier == supplier)
+    if branch:
+        query = query.where(Component.branch == branch)
     if status == "out-of-stock":
         query = query.where(Component.quantity == 0)
     elif status == "low-stock":
@@ -89,6 +99,79 @@ def list_components(
 
 def list_active_components(db: Session) -> list[Component]:
     return list(db.scalars(select(Component).where(Component.active.is_(True))))
+
+def list_categories(db: Session) -> list[str]:
+    return list(
+        db.scalars(
+            select(Component.category)
+            .where(Component.active.is_(True))
+            .distinct()
+            .order_by(func.lower(Component.category))
+        )
+    )
+
+
+def list_suppliers(db: Session) -> list[str]:
+    names_by_normalized: dict[str, str] = {}
+    supplier_names = db.scalars(
+        select(Supplier.name).order_by(func.lower(Supplier.name))
+    )
+    component_names = db.scalars(
+        select(Component.supplier).distinct().order_by(
+            func.lower(Component.supplier)
+        )
+    )
+
+    for name in supplier_names:
+        names_by_normalized.setdefault(name.casefold(), name)
+    for name in component_names:
+        names_by_normalized.setdefault(name.casefold(), name)
+
+    return sorted(names_by_normalized.values(), key=str.casefold)
+
+
+def create_supplier(db: Session, name: str) -> Supplier:
+    normalized_name = name.casefold()
+    if any(
+        existing_name.casefold() == normalized_name
+        for existing_name in list_suppliers(db)
+    ):
+        raise ValueError("A supplier with this name already exists.")
+
+    supplier = Supplier(name=name, normalized_name=normalized_name)
+    db.add(supplier)
+    db.commit()
+    db.refresh(supplier)
+    return supplier
+
+
+def list_branches(db: Session) -> list[str]:
+    return list(
+        db.scalars(
+            select(Branch.name).order_by(func.lower(Branch.name))
+        )
+    )
+
+
+def create_branch(db: Session, name: str) -> Branch:
+    normalized_name = name.casefold()
+    existing = db.scalar(
+        select(Branch).where(Branch.normalized_name == normalized_name)
+    )
+    if existing is not None:
+        raise ValueError("A branch with this name already exists.")
+
+    branch = Branch(name=name, normalized_name=normalized_name)
+    db.add(branch)
+    db.commit()
+    db.refresh(branch)
+    return branch
+
+
+def find_branch_by_name(db: Session, name: str) -> Branch | None:
+    return db.scalar(
+        select(Branch).where(Branch.normalized_name == name.casefold())
+    )
 
 
 def get_active_component(db: Session, component_id: int) -> Component | None:

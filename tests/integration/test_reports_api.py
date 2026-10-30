@@ -207,10 +207,12 @@ def test_export_availability_report_as_csv(client, admin_token):
 
     assert rows[0] == [
         "SKU", "Name", "Category", "Quantity",
-        "Unit Price", "Supplier", "Reorder Level", "Stock Status"
+        "Unit Price", "Supplier", "Branch", "Reorder Level", "Stock Status"
     ]
     assert len(rows) > 1
     assert any(row[1] == "Arduino Uno" for row in rows[1:])
+    arduino_row = next(row for row in rows[1:] if row[1] == "Arduino Uno")
+    assert arduino_row[6] == "Main Branch"
 
 
 def test_export_availability_report_as_excel(client, admin_token):

@@ -12,9 +12,11 @@ from sqlalchemy import delete
 from app.models import (
     AuditLog,
     AvailabilityCheck,
+    Branch,
     Component,
     DowntimeIncident,
     MaintenanceWindow,
+    Supplier,
     User,
 )
 
@@ -27,8 +29,10 @@ def clean_db():
     db.execute(delete(AvailabilityCheck))
     db.execute(delete(DowntimeIncident))
     db.execute(delete(MaintenanceWindow))
+    db.execute(delete(Supplier))
     db.execute(delete(AuditLog))
     db.execute(delete(Component))
+    db.execute(delete(Branch))
     db.execute(delete(User))
 
     db.commit()

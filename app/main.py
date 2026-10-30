@@ -1,5 +1,7 @@
 import csv
 import os
+import logging
+
 
 from fastapi.responses import FileResponse, Response
 from openpyxl import Workbook
@@ -23,12 +25,15 @@ from .db import get_db
 from .models import (
     AuditLog,
     AvailabilityCheck,
+    Branch,
     Component,
     DowntimeIncident,
     MaintenanceWindow,
     User,
 )
 from .schemas import (
+    BranchCreate,
+    BranchResponse,
     ComponentCreate,
     ComponentResponse,
     ComponentUpdate,
@@ -36,6 +41,8 @@ from .schemas import (
     AvailabilityResponse,
     LoginRequest,
     LoginResponse,
+    SupplierCreate,
+    SupplierResponse,
     StockMovementCreate,
     StockMovementResponse,
 )
@@ -45,6 +52,7 @@ from .config import ENFORCE_HTTPS
 from . import repositories
 
 app = FastAPI(title="EIMS API", version="1.0.0")
+logger = logging.getLogger(__name__)
 if ENFORCE_HTTPS:
     app.add_middleware(HTTPSRedirectMiddleware)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -102,11 +110,92 @@ def component_response_data(component: Component, user: User) -> dict:
     return data
 
 
+@app.get("/api/categories", response_model=list[str])
+def get_categories(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return repositories.list_categories(db)
+
+
+@app.get("/api/suppliers", response_model=list[str])
+def get_suppliers(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return repositories.list_suppliers(db)
+
+
+@app.post(
+    "/api/suppliers",
+    response_model=SupplierResponse,
+    status_code=201,
+)
+def add_supplier(
+    payload: SupplierCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_manager),
+):
+    try:
+        return repositories.create_supplier(db, payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="A supplier with this name already exists.",
+        ) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="The supplier could not be saved due to a database error.",
+        ) from exc
+
+
+@app.get("/api/branches", response_model=list[str])
+def get_branches(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return repositories.list_branches(db)
+
+
+@app.post(
+    "/api/branches",
+    response_model=BranchResponse,
+    status_code=201,
+)
+def add_branch(
+    payload: BranchCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_manager),
+):
+    try:
+        return repositories.create_branch(db, payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="A branch with this name already exists.",
+        ) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="The branch could not be saved due to a database error.",
+        ) from exc
+
+
 @app.get("/api/inventory", response_model=list[ComponentResponse])
 def list_inventory(
     search: str | None = None,
     category: str | None = None,
     supplier: str | None = None,
+    branch: str | None = None,
     status: str | None = None,
     sort: str = Query(default="id"),
     limit: int = Query(default=100, ge=1, le=500),
@@ -117,6 +206,7 @@ def list_inventory(
     search = validate_search(search)
     category = validate_search(category)
     supplier = validate_search(supplier)
+    branch = validate_search(branch)
     if status not in {None, "in-stock", "low-stock", "out-of-stock"}:
         raise HTTPException(
             status_code=422,
@@ -129,6 +219,7 @@ def list_inventory(
             search=search,
             category=category,
             supplier=supplier,
+            branch=branch,
             status=status,
             sort=sort,
             allow_date_sort=user.role == "ADMIN",
@@ -151,9 +242,17 @@ def add_component(
     user: User = Depends(require_manager),
 ):
     try:
+        branch = repositories.find_branch_by_name(db, payload.branch)
+        if branch is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Choose a branch from the branch list.",
+            )
+        values = payload.model_dump()
+        values["branch"] = branch.name
         component = repositories.create_component(
             db,
-            payload.model_dump(),
+            values,
         )
         return component
 
@@ -307,6 +406,56 @@ async def upload_component_image(
         "image_url": component.image_url,
     }
 
+@app.delete("/api/inventory/{component_id}/image")
+def remove_component_image(
+    component_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_manager),
+):
+    component = repositories.get_active_component(db, component_id)
+
+    if not component:
+        raise HTTPException(
+            status_code=404,
+            detail="Component not found or inactive.",
+        )
+
+    old_image_url = component.image_url
+
+    if not old_image_url:
+        raise HTTPException(
+            status_code=404,
+            detail="No image is currently uploaded for this component.",
+        )
+
+    try:
+        component.image_url = None
+        db.commit()
+        db.refresh(component)
+
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Image removal failed. The existing image was preserved.",
+        ) from exc
+
+    if old_image_url.startswith("/uploads/components/"):
+        old_filename = Path(old_image_url).name
+        old_path = UPLOAD_DIR / old_filename
+
+        if old_path.is_file():
+            try:
+                old_path.unlink()
+            except OSError:
+                pass
+
+    return {
+        "message": "Component image removed successfully.",
+        "component_id": component.id,
+        "image_url": None,
+    }
+
 @app.get("/api/inventory/{component_id}", response_model=ComponentResponse)
 def get_component(
     component_id: int,
@@ -399,11 +548,21 @@ def update_component(
     if not component:
         raise HTTPException(status_code=404, detail="Component not found")
 
+    updates = payload.model_dump(exclude_none=True)
+    if "branch" in updates:
+        branch = repositories.find_branch_by_name(db, updates["branch"])
+        if branch is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Choose a branch from the branch list.",
+            )
+        updates["branch"] = branch.name
+
     try:
         component = repositories.update_component(
             db,
             component,
-            payload.model_dump(exclude_none=True),
+            updates,
         )
     except SQLAlchemyError as exc:
         db.rollback()
@@ -477,6 +636,7 @@ def export_availability_report(
         "Quantity",
         "Unit Price",
         "Supplier",
+        "Branch",
         "Reorder Level",
         "Stock Status",
     ]
@@ -489,6 +649,7 @@ def export_availability_report(
             item["quantity"],
             item["unit_price"],
             item["supplier"],
+            item["branch"],
             item["reorder_level"],
             item["status"],
         ]
@@ -558,6 +719,7 @@ def export_availability_report(
         },
     )
 
+
 @app.get("/api/reports/system-availability")
 def system_availability(
     year: int = Query(..., ge=2000, le=2100),
@@ -567,199 +729,213 @@ def system_availability(
 ):
     from datetime import timedelta
 
-    now = datetime.now(timezone.utc)
+    try:
+        now = datetime.now(timezone.utc)
 
-    month_start = datetime(year, month, 1, tzinfo=timezone.utc)
+        month_start = datetime(year, month, 1, tzinfo=timezone.utc)
 
-    if month == 12:
-        month_end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
-    else:
-        month_end = datetime(year, month + 1, 1, tzinfo=timezone.utc)
+        if month == 12:
+            month_end = datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            month_end = datetime(year, month + 1, 1, tzinfo=timezone.utc)
 
-    # Do not calculate availability for a future period.
-    reporting_end = min(month_end, now)
+        # Do not calculate availability for a future period.
+        reporting_end = min(month_end, now)
 
-    if reporting_end <= month_start:
-        return {
-            "year": year,
-            "month": month,
-            "monitoring_started": False,
-            "coverage_complete": False,
-            "availability_percentage": None,
-            "target_percentage": 99.5,
-            "target_met": None,
-            "message": "No monitoring period is available for this month.",
-        }
+        if reporting_end <= month_start:
+            return {
+                "year": year,
+                "month": month,
+                "monitoring_started": False,
+                "coverage_complete": False,
+                "availability_percentage": None,
+                "target_percentage": 99.5,
+                "target_met": None,
+                "message": "No monitoring period is available for this month.",
+            }
 
-    def as_utc(value):
-        if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+        def as_utc(value):
+            if value.tzinfo is None:
+                return value.replace(tzinfo=timezone.utc)
+            return value.astimezone(timezone.utc)
 
-    checks = db.query(AvailabilityCheck).filter(
-        AvailabilityCheck.checked_at >= month_start,
-        AvailabilityCheck.checked_at < reporting_end,
-    ).order_by(AvailabilityCheck.checked_at).all()
+        checks = db.query(AvailabilityCheck).filter(
+            AvailabilityCheck.checked_at >= month_start,
+            AvailabilityCheck.checked_at < reporting_end,
+        ).order_by(AvailabilityCheck.checked_at).all()
 
-    if not checks:
-        return {
-            "year": year,
-            "month": month,
-            "monitoring_started": False,
-            "coverage_complete": False,
-            "availability_percentage": None,
-            "target_percentage": 99.5,
-            "target_met": None,
-            "message": "No monitoring checks were recorded for this month.",
-        }
+        if not checks:
+            return {
+                "year": year,
+                "month": month,
+                "monitoring_started": False,
+                "coverage_complete": False,
+                "availability_percentage": None,
+                "target_percentage": 99.5,
+                "target_met": None,
+                "message": "No monitoring checks were recorded for this month.",
+            }
 
-    first_check = as_utc(checks[0].checked_at)
-    last_check = as_utc(checks[-1].checked_at)
+        first_check = as_utc(checks[0].checked_at)
+        last_check = as_utc(checks[-1].checked_at)
 
-    # Allow one monitoring interval of tolerance at each boundary.
-    tolerance = timedelta(seconds=int(os.getenv("EIMS_MONITOR_INTERVAL_SECONDS", "10")))
+        tolerance = timedelta(
+            seconds=int(os.getenv("EIMS_MONITOR_INTERVAL_SECONDS", "10"))
+        )
 
-    coverage_complete = (
-        first_check <= month_start + tolerance
-        and last_check >= reporting_end - tolerance
-    )
+        coverage_complete = (
+            first_check <= month_start + tolerance
+            and last_check >= reporting_end - tolerance
+        )
 
-    coverage_start = max(first_check, month_start)
-    coverage_end = min(last_check, reporting_end)
+        coverage_start = max(first_check, month_start)
+        coverage_end = min(last_check, reporting_end)
 
-    total_seconds = (coverage_end - coverage_start).total_seconds()
+        total_seconds = (coverage_end - coverage_start).total_seconds()
 
-    if total_seconds <= 0:
-        coverage_complete = False
+        if total_seconds <= 0:
+            coverage_complete = False
 
-    def merge_intervals(intervals):
-        if not intervals:
-            return []
+        def merge_intervals(intervals):
+            if not intervals:
+                return []
 
-        intervals.sort(key=lambda interval: interval[0])
-        merged = [intervals[0]]
+            intervals.sort(key=lambda interval: interval[0])
+            merged = [intervals[0]]
 
-        for start, end in intervals[1:]:
-            previous_start, previous_end = merged[-1]
+            for start, end in intervals[1:]:
+                previous_start, previous_end = merged[-1]
 
-            if start <= previous_end:
-                merged[-1] = (previous_start, max(previous_end, end))
-            else:
-                merged.append((start, end))
-
-        return merged
-
-    maintenance_windows = db.query(MaintenanceWindow).filter(
-        MaintenanceWindow.start_time < coverage_end,
-        MaintenanceWindow.end_time > coverage_start,
-    ).all()
-
-    maintenance_intervals = []
-
-    for window in maintenance_windows:
-        start = max(as_utc(window.start_time), coverage_start)
-        end = min(as_utc(window.end_time), coverage_end)
-
-        if end > start:
-            maintenance_intervals.append((start, end))
-
-    maintenance_intervals = merge_intervals(maintenance_intervals)
-
-    maintenance_seconds = sum(
-        (end - start).total_seconds()
-        for start, end in maintenance_intervals
-    )
-
-    eligible_seconds = total_seconds - maintenance_seconds
-
-    incidents = db.query(DowntimeIncident).filter(
-        DowntimeIncident.started_at < coverage_end,
-        (DowntimeIncident.ended_at.is_(None))
-        | (DowntimeIncident.ended_at > coverage_start),
-    ).all()
-
-    downtime_intervals = []
-
-    for incident in incidents:
-        start = max(as_utc(incident.started_at), coverage_start)
-        incident_end = as_utc(incident.ended_at) if incident.ended_at else now
-        end = min(incident_end, coverage_end)
-
-        if end > start:
-            downtime_intervals.append((start, end))
-
-    downtime_intervals = merge_intervals(downtime_intervals)
-
-    # Exclude scheduled maintenance from downtime.
-    unplanned_intervals = []
-
-    for start, end in downtime_intervals:
-        remaining = [(start, end)]
-
-        for maintenance_start, maintenance_end in maintenance_intervals:
-            updated = []
-
-            for current_start, current_end in remaining:
-                if (
-                    maintenance_end <= current_start
-                    or maintenance_start >= current_end
-                ):
-                    updated.append((current_start, current_end))
+                if start <= previous_end:
+                    merged[-1] = (previous_start, max(previous_end, end))
                 else:
-                    if current_start < maintenance_start:
-                        updated.append((current_start, maintenance_start))
+                    merged.append((start, end))
 
-                    if current_end > maintenance_end:
-                        updated.append((maintenance_end, current_end))
+            return merged
 
-            remaining = updated
+        maintenance_windows = db.query(MaintenanceWindow).filter(
+            MaintenanceWindow.start_time < coverage_end,
+            MaintenanceWindow.end_time > coverage_start,
+        ).all()
 
-        unplanned_intervals.extend(remaining)
+        maintenance_intervals = []
 
-    unplanned_seconds = sum(
-        (end - start).total_seconds()
-        for start, end in unplanned_intervals
-    )
+        for window in maintenance_windows:
+            start = max(as_utc(window.start_time), coverage_start)
+            end = min(as_utc(window.end_time), coverage_end)
 
-    availability_percentage = (
-        (eligible_seconds - unplanned_seconds) / eligible_seconds * 100
-        if eligible_seconds > 0
-        else None
-    )
+            if end > start:
+                maintenance_intervals.append((start, end))
 
-    # Only evaluate the target when the monitoring period is complete.
-    target_met = (
-        availability_percentage >= 99.5
-        if coverage_complete and availability_percentage is not None
-        else None
-    )
+        maintenance_intervals = merge_intervals(maintenance_intervals)
 
-    return {
-        "year": year,
-        "month": month,
-        "monitoring_started": True,
-        "coverage_start": coverage_start.isoformat(),
-        "coverage_end": coverage_end.isoformat(),
-        "coverage_complete": coverage_complete,
-        "total_seconds": round(total_seconds, 2),
-        "scheduled_maintenance_seconds": round(maintenance_seconds, 2),
-        "eligible_seconds": round(eligible_seconds, 2),
-        "unplanned_downtime_seconds": round(unplanned_seconds, 2),
-        "availability_percentage": (
-            round(availability_percentage, 4)
-            if availability_percentage is not None
+        maintenance_seconds = sum(
+            (end - start).total_seconds()
+            for start, end in maintenance_intervals
+        )
+
+        eligible_seconds = total_seconds - maintenance_seconds
+
+        incidents = db.query(DowntimeIncident).filter(
+            DowntimeIncident.started_at < coverage_end,
+            (DowntimeIncident.ended_at.is_(None))
+            | (DowntimeIncident.ended_at > coverage_start),
+        ).all()
+
+        downtime_intervals = []
+
+        for incident in incidents:
+            start = max(as_utc(incident.started_at), coverage_start)
+            incident_end = (
+                as_utc(incident.ended_at) if incident.ended_at else now
+            )
+            end = min(incident_end, coverage_end)
+
+            if end > start:
+                downtime_intervals.append((start, end))
+
+        downtime_intervals = merge_intervals(downtime_intervals)
+
+        # Exclude scheduled maintenance from downtime.
+        unplanned_intervals = []
+
+        for start, end in downtime_intervals:
+            remaining = [(start, end)]
+
+            for maintenance_start, maintenance_end in maintenance_intervals:
+                updated = []
+
+                for current_start, current_end in remaining:
+                    if (
+                        maintenance_end <= current_start
+                        or maintenance_start >= current_end
+                    ):
+                        updated.append((current_start, current_end))
+                    else:
+                        if current_start < maintenance_start:
+                            updated.append((current_start, maintenance_start))
+
+                        if current_end > maintenance_end:
+                            updated.append((maintenance_end, current_end))
+
+                remaining = updated
+
+            unplanned_intervals.extend(remaining)
+
+        unplanned_seconds = sum(
+            (end - start).total_seconds()
+            for start, end in unplanned_intervals
+        )
+
+        availability_percentage = (
+            (eligible_seconds - unplanned_seconds) / eligible_seconds * 100
+            if eligible_seconds > 0
             else None
-        ),
-        "target_percentage": 99.5,
-        "target_met": target_met,
-        "message": (
-            "Monthly target evaluated."
-            if coverage_complete
-            else "Monitoring coverage is incomplete. The monthly target cannot be evaluated reliably."
-        ),
-    }
+        )
 
+        target_met = (
+            availability_percentage >= 99.5
+            if coverage_complete and availability_percentage is not None
+            else None
+        )
 
+        return {
+            "year": year,
+            "month": month,
+            "monitoring_started": True,
+            "coverage_start": coverage_start.isoformat(),
+            "coverage_end": coverage_end.isoformat(),
+            "coverage_complete": coverage_complete,
+            "total_seconds": round(total_seconds, 2),
+            "scheduled_maintenance_seconds": round(maintenance_seconds, 2),
+            "eligible_seconds": round(eligible_seconds, 2),
+            "unplanned_downtime_seconds": round(unplanned_seconds, 2),
+            "availability_percentage": (
+                round(availability_percentage, 4)
+                if availability_percentage is not None
+                else None
+            ),
+            "target_percentage": 99.5,
+            "target_met": target_met,
+            "message": (
+                "Monthly target evaluated."
+                if coverage_complete
+                else "Monitoring coverage is incomplete. The monthly target cannot be evaluated reliably."
+            ),
+        }
+
+    except HTTPException:
+        raise
+
+    except Exception:
+        db.rollback()
+        logger.exception(
+            "Unexpected error while generating system availability report"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to generate the system availability report due to an unexpected error.",
+        )
 
 @app.get("/api/dashboard", response_model=DashboardResponse)
 def dashboard(
