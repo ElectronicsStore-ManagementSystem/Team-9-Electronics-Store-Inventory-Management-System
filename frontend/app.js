@@ -1,5 +1,6 @@
 let token = localStorage.getItem('eims_token');
 let role = localStorage.getItem('eims_role');
+let availableBranches = [];
 
 const $ = id => document.getElementById(id);
 
@@ -134,7 +135,7 @@ function setLoggedIn() {
     'hidden',
     !['ADMIN', 'MANAGER'].includes(role)
   );
-  $('supplier-btn').classList.toggle(
+  $('branch-btn').classList.toggle(
     'hidden',
     !['ADMIN', 'MANAGER'].includes(role)
   );
@@ -143,8 +144,8 @@ function setLoggedIn() {
     ? 'Staff · Read-only view'
     : `${role === 'ADMIN' ? 'Admin' : 'Manager'} · Full view`;
   $('dashboard-description').textContent = isStaff
-    ? 'Review inventory, stock levels, and suppliers. Changes require a manager.'
-    : 'Track and manage components, stock levels, and suppliers.';
+    ? 'Review inventory, stock levels, and shop branches. Changes require a manager.'
+    : 'Track components and manage stock across shop branches.';
   $('quick-start-add-step').innerHTML = ['ADMIN', 'MANAGER'].includes(role)
     ? '<strong>Add it:</strong> choose <strong>Add component</strong> and complete the form.'
     : '<strong>Add it:</strong> ask a manager to add new stock; you can search and review components here.';
@@ -198,7 +199,8 @@ $('logout').onclick = () => {
   $('trend-chart').innerHTML = '';
   $('low-stock-alert').classList.add('hidden');
   $('low-stock-alert-items').innerHTML = '';
-  $('form-card').classList.add('hidden');
+  if ($('form-card').open) $('form-card').close();
+  if ($('branch-card').open) $('branch-card').close();
   $('add-feedback').classList.add('hidden');
   $('add-feedback').textContent = '';
 
@@ -209,20 +211,102 @@ $('logout').onclick = () => {
 
 $('refresh').onclick = refresh;
 let searchTimer;
+let searchRefreshTimer;
+$('search-results-list').addEventListener('click', event => {
+  const componentButton = event.target.closest('[data-component-id]');
+  if (componentButton) {
+    showComponentDetails(componentButton.dataset.componentId);
+  }
+});
+$('search-results-list').addEventListener('keydown', event => {
+  const suggestions = [...$('search-results-list').querySelectorAll('[role="option"]')];
+  const currentIndex = suggestions.indexOf(document.activeElement);
+
+  if (event.key === 'ArrowDown' && currentIndex < suggestions.length - 1) {
+    event.preventDefault();
+    suggestions[currentIndex + 1].focus();
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    if (currentIndex <= 0) {
+      $('search').focus();
+    } else {
+      suggestions[currentIndex - 1].focus();
+    }
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    $('search').focus();
+  }
+});
+
+function updateSearchView() {
+  const search = $('search').value.trim();
+  const isSearching = search.length > 0;
+  $('app').classList.toggle('search-active', isSearching);
+  $('search-results').classList.toggle('hidden', !isSearching);
+  $('search').setAttribute('aria-expanded', String(isSearching));
+
+  if (!isSearching) {
+    clearInterval(searchRefreshTimer);
+    $('search-results-status').textContent = '';
+    $('search-results-list').replaceChildren();
+    return;
+  }
+
+  $('search-results-status').textContent = 'Searching inventory...';
+  clearInterval(searchRefreshTimer);
+  searchRefreshTimer = setInterval(() => {
+    if (token && $('search').value.trim()) {
+      refresh();
+    }
+  }, 5000);
+}
+
+function updateFilterView() {
+  const hasActiveFilter = ['category', 'supplier', 'branch', 'status']
+    .some(id => $(id).value !== '');
+  $('app').classList.toggle('filter-active', hasActiveFilter);
+}
+
 $('search').oninput = () => {
+  updateSearchView();
   clearTimeout(searchTimer);
   searchTimer = setTimeout(refresh, 300);
 };
 $('search').onkeydown = event => {
+  if (event.key === 'ArrowDown') {
+    const firstSuggestion = $('search-results-list').querySelector(
+      '[role="option"]'
+    );
+    if (firstSuggestion) {
+      event.preventDefault();
+      firstSuggestion.focus();
+    }
+    return;
+  }
+
   if (event.key === 'Enter') {
     event.preventDefault();
     clearTimeout(searchTimer);
+    updateSearchView();
     refresh();
   }
 };
-$('category').onchange = refresh;
-$('supplier').onchange = refresh;
-$('status').onchange = refresh;
+$('category').onchange = () => {
+  updateFilterView();
+  refresh();
+};
+$('supplier').onchange = () => {
+  updateFilterView();
+  refresh();
+};
+$('branch').onchange = () => {
+  updateFilterView();
+  refresh();
+};
+$('status').onchange = () => {
+  updateFilterView();
+  refresh();
+};
 $('sort-by').onchange = refresh;
 $('sort-order').onchange = refresh;
 $('inventory').addEventListener('click', event => {
@@ -246,6 +330,9 @@ $('low-stock-alert-items').addEventListener('click', event => {
 $('view-low-stock').onclick = () => {
   $('search').value = '';
   $('status').value = 'low-stock';
+  document.querySelector('.filter-panel').open = true;
+  updateSearchView();
+  updateFilterView();
   refresh();
   $('inventory').scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
@@ -273,6 +360,7 @@ $('component-details').addEventListener('submit', async event => {
     quantity: Number(formData.get('quantity')),
     unit_price: Number(formData.get('unit_price')),
     supplier: String(formData.get('supplier')).trim(),
+    branch: String(formData.get('branch')).trim(),
     reorder_level: Number(formData.get('reorder_level'))
   };
 
@@ -315,35 +403,42 @@ $('clear-filters').onclick = () => {
   $('search').value = '';
   $('category').value = '';
   $('supplier').value = '';
+  $('branch').value = '';
   $('status').value = '';
   $('sort-by').value = 'id';
   $('sort-order').value = 'asc';
+  updateSearchView();
+  updateFilterView();
   refresh();
 };
-$('supplier-btn').onclick = () => {
-  $('supplier-feedback').classList.add('hidden');
-  $('supplier-feedback').textContent = '';
-  $('supplier-error').textContent = '';
-  $('supplier-card').classList.remove('hidden');
-  $('supplier-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  $('supplier-name').focus();
+$('branch-btn').onclick = () => {
+  $('branch-feedback').classList.add('hidden');
+  $('branch-feedback').textContent = '';
+  $('branch-management-error').textContent = '';
+  $('branch-card').showModal();
+  $('branch-name').focus();
 };
-$('cancel-supplier').onclick = () => {
-  $('supplier-form').reset();
-  $('supplier-card').classList.add('hidden');
-  $('supplier-error').textContent = '';
+$('cancel-branch').onclick = () => {
+  $('branch-form').reset();
+  $('branch-card').close();
+  $('branch-management-error').textContent = '';
 };
-$('supplier-form').onsubmit = async event => {
+$('branch-card').addEventListener('click', event => {
+  if (event.target === $('branch-card')) {
+    $('branch-card').close();
+  }
+});
+$('branch-form').onsubmit = async event => {
   event.preventDefault();
   const form = event.target;
-  const nameInput = $('supplier-name');
+  const nameInput = $('branch-name');
   const name = nameInput.value.trim();
   const submitButton = form.querySelector('[type="submit"]');
-  $('supplier-error').textContent = '';
-  $('supplier-feedback').classList.add('hidden');
+  $('branch-management-error').textContent = '';
+  $('branch-feedback').classList.add('hidden');
 
   if (!name) {
-    nameInput.setCustomValidity('Supplier name is required.');
+    nameInput.setCustomValidity('Branch or area name is required.');
     nameInput.reportValidity();
     return;
   }
@@ -352,24 +447,24 @@ $('supplier-form').onsubmit = async event => {
   submitButton.disabled = true;
   submitButton.textContent = 'Saving...';
   try {
-    const supplier = await api('/api/suppliers', {
+    const branch = await api('/api/branches', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name })
     });
     form.reset();
-    $('supplier-feedback').textContent =
-      `${supplier.name} added successfully.`;
-    $('supplier-feedback').classList.remove('hidden');
+    $('branch-feedback').textContent =
+      `${branch.name} added successfully.`;
+    $('branch-feedback').classList.remove('hidden');
     await refresh();
   } catch (error) {
-    $('supplier-error').textContent = error.message;
+    $('branch-management-error').textContent = error.message;
   } finally {
     submitButton.disabled = false;
-    submitButton.textContent = 'Add supplier';
+    submitButton.textContent = 'Add branch';
   }
 };
-$('supplier-name').addEventListener('input', event => {
+$('branch-name').addEventListener('input', event => {
   event.target.setCustomValidity('');
 });
 
@@ -379,6 +474,7 @@ const componentFields = [
   'quantity',
   'unit_price',
   'supplier',
+  'branch',
   'reorder_level'
 ];
 
@@ -388,6 +484,7 @@ const fieldLabels = {
   quantity: 'Quantity',
   unit_price: 'Unit price',
   supplier: 'Supplier',
+  branch: 'Shop branch',
   reorder_level: 'Reorder level'
 };
 
@@ -475,25 +572,38 @@ function displayValidationErrors(details) {
 $('add-btn').onclick = () => {
   $('add-feedback').classList.add('hidden');
   $('add-feedback').textContent = '';
-  $('form-card').classList.remove('hidden');
-  $('form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('form-card').showModal();
   $('component-form').elements.namedItem('name').focus();
 };
 
 $('cancel-add').onclick = () => {
   $('component-form').reset();
   clearFieldErrors();
-  $('form-card').classList.add('hidden');
+  $('form-card').close();
 };
+$('form-card').addEventListener('click', event => {
+  if (event.target === $('form-card')) {
+    $('form-card').close();
+  }
+});
+$('form-card').addEventListener('close', () => {
+  $('component-form').reset();
+  clearFieldErrors();
+});
+$('branch-card').addEventListener('close', () => {
+  $('branch-form').reset();
+  $('branch-management-error').textContent = '';
+});
 
 const addTextFields = {
   name: 'Component name',
   category: 'Category',
-  supplier: 'Supplier'
+  supplier: 'Supplier',
+  branch: 'Shop branch'
 };
 for (const fieldName of Object.keys(addTextFields)) {
   $('component-form').elements.namedItem(fieldName).addEventListener(
-    fieldName === 'supplier' ? 'change' : 'input',
+  ['supplier', 'branch'].includes(fieldName) ? 'change' : 'input',
     event => event.target.setCustomValidity('')
   );
 }
@@ -603,7 +713,7 @@ $('component-form').onsubmit = async event => {
     form.reset();
     clearFieldErrors();
     
-    $('form-card').classList.add('hidden');
+    $('form-card').close();
     $('add-feedback').textContent =
       `${component.name} added successfully (SKU: ${component.sku}).`;
     $('add-feedback').classList.remove('hidden');
@@ -632,6 +742,7 @@ $('component-form').onsubmit = async event => {
 
 let currentComponent = null;
 let availableSuppliers = [];
+let refreshRequestId = 0;
 
 function populateSelect(select, values, placeholder) {
   const selectedValue = select.value;
@@ -652,31 +763,32 @@ function populateSelect(select, values, placeholder) {
   select.value = values.includes(selectedValue) ? selectedValue : '';
 }
 
-function renderSupplierList(suppliers) {
-  const list = $('supplier-list');
+function renderBranchList(branches) {
+  const list = $('branch-list');
   list.replaceChildren();
 
-  if (!suppliers.length) {
+  if (!branches.length) {
     const item = document.createElement('li');
     item.className = 'empty-state';
-    item.textContent = 'No suppliers have been added yet.';
+    item.textContent = 'No branches have been added yet.';
     list.append(item);
     return;
   }
 
-  suppliers.forEach(supplier => {
+  branches.forEach(branch => {
     const item = document.createElement('li');
-    item.textContent = supplier;
+    item.textContent = branch;
     list.append(item);
   });
 }
 
 async function refresh() {
   if (!token) return;
+  const requestId = ++refreshRequestId;
 
   $('inventory').innerHTML = `
     <tr>
-      <td colspan="9">Loading inventory...</td>
+      <td colspan="10">Loading inventory...</td>
     </tr>
   `;
 
@@ -704,6 +816,11 @@ async function refresh() {
       query.set('supplier', supplier);
     }
 
+    const branch = $('branch').value;
+    if (branch) {
+      query.set('branch', branch);
+    }
+
     // Filter by stock status
     const statusFilter = $('status').value;
 
@@ -721,22 +838,37 @@ async function refresh() {
     );
 
     // Send all selected filters in one request
-    const [items, dashboard, categories, suppliers] = await Promise.all([
+    const [items, dashboard, categories, suppliers, branches] = await Promise.all([
       api('/api/inventory?' + query.toString()),
       api('/api/dashboard'),
       api('/api/categories'),
-      api('/api/suppliers')
+      api('/api/suppliers'),
+      api('/api/branches')
     ]);
 
+    if (
+      requestId !== refreshRequestId ||
+      $('search').value.trim() !== search
+    ) {
+      return;
+    }
+
     availableSuppliers = suppliers;
+    availableBranches = branches;
     populateSelect($('category'), categories, 'All categories');
     populateSelect($('supplier'), suppliers, 'All suppliers');
+    populateSelect($('branch'), branches, 'All branches');
     populateSelect(
       $('component-form').elements.namedItem('supplier'),
       suppliers,
       'Choose a supplier'
     );
-    renderSupplierList(suppliers);
+    populateSelect(
+      $('component-form').elements.namedItem('branch'),
+      branches,
+      'Choose a branch'
+    );
+    renderBranchList(branches);
 
     // Dashboard statistics
     $('stats').innerHTML = `
@@ -799,12 +931,13 @@ async function refresh() {
 
     $('results-count').textContent =
       `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
+    renderSearchResults(items);
 
     // Handle empty results
     if (!items.length) {
       $('inventory').innerHTML = `
         <tr>
-          <td colspan="9">
+          <td colspan="10">
             No matching components found.
             Try changing or clearing your filters.
           </td>
@@ -907,6 +1040,7 @@ async function refresh() {
           </td>
           <td>₹${Number(component.unit_price).toFixed(2)}</td>
           <td>${escapeHTML(component.supplier)}</td>
+          <td>${escapeHTML(component.branch)}</td>
           <td>${component.reorder_level}</td>
           <td><span class="status-badge status-${stockStatus}">${statusLabel}</span></td>
           <td>${action}</td>
@@ -915,7 +1049,12 @@ async function refresh() {
     }).join('');
 
   } catch (error) {
+    if (requestId !== refreshRequestId) return;
     console.error('Failed to load inventory:', error);
+    if ($('search').value.trim()) {
+      $('search-results-status').textContent =
+        'Unable to search inventory. Please try again.';
+    }
 
     if (
       error.message.includes('401') ||
@@ -937,12 +1076,48 @@ async function refresh() {
 
     $('inventory').innerHTML = `
       <tr>
-        <td colspan="9">
+        <td colspan="10">
           Unable to load inventory. Please try refreshing.
         </td>
       </tr>
     `;
   }
+}
+
+function renderSearchResults(items) {
+  const search = $('search').value.trim();
+  if (!search) return;
+
+  const status = $('search-results-status');
+  const list = $('search-results-list');
+  status.textContent = items.length
+    ? `${items.length} ${items.length === 1 ? 'matching component' : 'matching components'}`
+    : 'No matching components found.';
+
+  list.innerHTML = items.map(component => `
+    <button
+      class="search-result"
+      type="button"
+      role="option"
+      aria-selected="false"
+      data-component-id="${component.id}"
+      aria-label="View ${escapeHTML(component.name)}, SKU ${escapeHTML(component.sku)}"
+    >
+      <span class="search-result-heading">
+        <strong>${escapeHTML(component.name)}</strong>
+        <span>${escapeHTML(component.sku)}</span>
+      </span>
+      <span class="search-result-details">
+        ${escapeHTML(component.category)} · ${escapeHTML(component.supplier)}
+      </span>
+      <span class="search-result-stock">
+        ${escapeHTML(component.branch)}
+      </span>
+      <span class="search-result-stock">
+        ${component.quantity} in stock · ₹${Number(component.unit_price).toFixed(2)}
+      </span>
+    </button>
+  `).join('');
 }
 
 async function showComponentDetails(componentId) {
@@ -1057,6 +1232,10 @@ function renderComponentDetails(component) {
         <dd>${escapeHTML(component.supplier)}</dd>
       </div>
       <div class="detail-item">
+        <dt>Shop branch</dt>
+        <dd>${escapeHTML(component.branch)}</dd>
+      </div>
+      <div class="detail-item">
         <dt>Reorder level</dt>
         <dd>${component.reorder_level}</dd>
       </div>
@@ -1159,6 +1338,11 @@ function renderComponentEditForm(component, errorMessage = '') {
       ${escapeHTML(supplier)}
     </option>
   `).join('');
+  const branchOptions = availableBranches.map(branch => `
+    <option value="${escapeHTML(branch)}"${branch === component.branch ? ' selected' : ''}>
+      ${escapeHTML(branch)}
+    </option>
+  `).join('');
   $('component-details').innerHTML = `
     <form id="component-edit-form" class="component-edit-form">
       <label>
@@ -1174,6 +1358,13 @@ function renderComponentEditForm(component, errorMessage = '') {
         <select name="supplier" required>
           <option value="">Choose a supplier</option>
           ${supplierOptions}
+        </select>
+      </label>
+      <label>
+        Shop branch
+        <select name="branch" required>
+          <option value="">Choose a branch</option>
+          ${branchOptions}
         </select>
       </label>
       <label>

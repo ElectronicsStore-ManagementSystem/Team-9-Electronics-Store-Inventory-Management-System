@@ -23,12 +23,13 @@ from .db import get_db
 from .models import (
     AuditLog,
     AvailabilityCheck,
+    Branch,
     Component,
     DowntimeIncident,
     MaintenanceWindow,
     User,
 )
-from .schemas import ComponentCreate, ComponentResponse, ComponentUpdate, DashboardResponse, AvailabilityResponse, LoginRequest, LoginResponse, SupplierCreate, SupplierResponse
+from .schemas import BranchCreate, BranchResponse, ComponentCreate, ComponentResponse, ComponentUpdate, DashboardResponse, AvailabilityResponse, LoginRequest, LoginResponse, SupplierCreate, SupplierResponse
 from .security import create_access_token, get_current_user, require_admin, require_manager, verify_password
 from .services import stock_status, validate_search
 from .config import ENFORCE_HTTPS
@@ -136,11 +137,48 @@ def add_supplier(
         ) from exc
 
 
+@app.get("/api/branches", response_model=list[str])
+def get_branches(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return repositories.list_branches(db)
+
+
+@app.post(
+    "/api/branches",
+    response_model=BranchResponse,
+    status_code=201,
+)
+def add_branch(
+    payload: BranchCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_manager),
+):
+    try:
+        return repositories.create_branch(db, payload.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="A branch with this name already exists.",
+        ) from exc
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="The branch could not be saved due to a database error.",
+        ) from exc
+
+
 @app.get("/api/inventory", response_model=list[ComponentResponse])
 def list_inventory(
     search: str | None = None,
     category: str | None = None,
     supplier: str | None = None,
+    branch: str | None = None,
     status: str | None = None,
     sort: str = Query(default="id"),
     limit: int = Query(default=100, ge=1, le=500),
@@ -151,6 +189,7 @@ def list_inventory(
     search = validate_search(search)
     category = validate_search(category)
     supplier = validate_search(supplier)
+    branch = validate_search(branch)
     if status not in {None, "in-stock", "low-stock", "out-of-stock"}:
         raise HTTPException(
             status_code=422,
@@ -163,6 +202,7 @@ def list_inventory(
             search=search,
             category=category,
             supplier=supplier,
+            branch=branch,
             status=status,
             sort=sort,
             allow_date_sort=user.role == "ADMIN",
@@ -185,9 +225,17 @@ def add_component(
     user: User = Depends(require_manager),
 ):
     try:
+        branch = repositories.find_branch_by_name(db, payload.branch)
+        if branch is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Choose a branch from the branch list.",
+            )
+        values = payload.model_dump()
+        values["branch"] = branch.name
         component = repositories.create_component(
             db,
-            payload.model_dump(),
+            values,
         )
         return component
 
@@ -413,11 +461,21 @@ def update_component(
     if not component:
         raise HTTPException(status_code=404, detail="Component not found")
 
+    updates = payload.model_dump(exclude_none=True)
+    if "branch" in updates:
+        branch = repositories.find_branch_by_name(db, updates["branch"])
+        if branch is None:
+            raise HTTPException(
+                status_code=422,
+                detail="Choose a branch from the branch list.",
+            )
+        updates["branch"] = branch.name
+
     try:
         component = repositories.update_component(
             db,
             component,
-            payload.model_dump(exclude_none=True),
+            updates,
         )
     except SQLAlchemyError as exc:
         db.rollback()
@@ -491,6 +549,7 @@ def export_availability_report(
         "Quantity",
         "Unit Price",
         "Supplier",
+        "Branch",
         "Reorder Level",
         "Stock Status",
     ]
@@ -503,6 +562,7 @@ def export_availability_report(
             item["quantity"],
             item["unit_price"],
             item["supplier"],
+            item["branch"],
             item["reorder_level"],
             item["status"],
         ]

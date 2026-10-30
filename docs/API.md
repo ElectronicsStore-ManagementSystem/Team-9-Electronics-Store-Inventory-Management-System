@@ -63,7 +63,18 @@ The response can include inventory summary information, stock values, low-stock 
 
 Refer to `/docs` for the exact response schema.
 
-## 5. Supplier and Filter Options
+## 5. Branch, Supplier, and Filter Options
+
+### Branch Collection
+
+**Endpoint:** `/api/branches`
+
+Authenticated users can list branches. Admins and managers can add a branch
+with `POST /api/branches` using a JSON body containing a required `name`.
+Names are trimmed and duplicates are rejected without regard to case. New
+components are assigned to `Main Branch` by default for compatibility; select
+another branch with the `branch` field when needed. The inventory endpoint
+accepts an optional `branch` filter.
 
 ### Supplier Collection
 

@@ -26,6 +26,22 @@ class SupplierResponse(BaseModel):
     id: int
     name: str
 
+class BranchCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def trim_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Branch name cannot be blank.")
+        return value
+
+class BranchResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+
 class ComponentCreate(BaseModel):
     name: str = Field(
         min_length=1,
@@ -50,6 +66,12 @@ class ComponentCreate(BaseModel):
         max_length=120,
         description="Required supplier name",
     )
+    branch: str = Field(
+        default="Main Branch",
+        min_length=1,
+        max_length=120,
+        description="Shop branch holding this component",
+    )
     reorder_level: int = Field(default=5, ge=0)
     image_url: str | None = Field(default=None, max_length=500)
 
@@ -63,7 +85,7 @@ class ComponentCreate(BaseModel):
         return None
 
 
-    @field_validator("name", "category", "supplier")
+    @field_validator("name", "category", "supplier", "branch")
     @classmethod
     def trim_text(cls, value: str) -> str:
         value = value.strip()
@@ -78,6 +100,7 @@ class ComponentUpdate(BaseModel):
     quantity: int | None = Field(default=None, ge=0)
     unit_price: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     supplier: str | None = Field(default=None, min_length=1, max_length=120)
+    branch: str | None = Field(default=None, min_length=1, max_length=120)
     reorder_level: int | None = Field(default=None, ge=0)
 
     @field_validator("supplier")
@@ -90,6 +113,16 @@ class ComponentUpdate(BaseModel):
             raise ValueError("Supplier cannot be blank")
         return value
 
+    @field_validator("branch")
+    @classmethod
+    def trim_branch(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        value = value.strip()
+        if not value:
+            raise ValueError("Branch cannot be blank")
+        return value
+
 class ComponentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
@@ -99,6 +132,7 @@ class ComponentResponse(BaseModel):
     quantity: int
     unit_price: float
     supplier: str
+    branch: str
     reorder_level: int
     image_url: str | None
     active: bool

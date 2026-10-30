@@ -987,6 +987,19 @@ def test_search_inventory_by_category(client, staff_token):
         for item in items
     )
 
+def test_search_microprocessor_finds_microcontroller_components(
+    client, staff_token
+):
+    response = client.get(
+        "/api/inventory?search=microprocessor",
+        headers=auth(staff_token),
+    )
+
+    assert response.status_code == 200
+    items = response.json()
+    assert len(items) == 2
+    assert all(item["category"] == "Microcontroller" for item in items)
+
 
 def test_search_inventory_with_no_matches(client, staff_token):
     response = client.get(
