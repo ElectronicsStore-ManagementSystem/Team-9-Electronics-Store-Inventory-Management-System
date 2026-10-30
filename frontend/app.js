@@ -721,10 +721,22 @@ async function refresh() {
     );
 
     // Send all selected filters in one request
-    const [items, dashboard] = await Promise.all([
+    const [items, dashboard, categories, suppliers] = await Promise.all([
       api('/api/inventory?' + query.toString()),
-      api('/api/dashboard')
+      api('/api/dashboard'),
+      api('/api/categories'),
+      api('/api/suppliers')
     ]);
+
+    availableSuppliers = suppliers;
+    populateSelect($('category'), categories, 'All categories');
+    populateSelect($('supplier'), suppliers, 'All suppliers');
+    populateSelect(
+      $('component-form').elements.namedItem('supplier'),
+      suppliers,
+      'Choose a supplier'
+    );
+    renderSupplierList(suppliers);
 
     // Dashboard statistics
     $('stats').innerHTML = `
