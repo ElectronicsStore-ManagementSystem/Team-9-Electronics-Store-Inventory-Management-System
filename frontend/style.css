@@ -1449,14 +1449,14 @@ button.hidden {
   max-width: 320px;
   max-height: 240px;
   object-fit: contain;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border, #ddd);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface, #fff);
 }
 
 .no-component-image {
   margin: 0 0 1rem;
-  color: #666;
+  color: var(--muted, #666);
 }
 
 .component-image-form {
@@ -1464,17 +1464,41 @@ button.hidden {
   gap: 0.75rem;
   margin: 1rem 0;
   padding: 1rem;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border, #ddd);
   border-radius: 8px;
+  background: var(--surface, transparent);
+  color: var(--text, inherit);
 }
 
 .component-image-form input[type="file"] {
   max-width: 100%;
+  color: inherit;
+}
+
+.component-image-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .component-image-form .form-feedback {
   margin: 0;
   overflow-wrap: anywhere;
+}
+
+.component-image-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .component-image-actions {
+    flex-direction: column;
+  }
+
+  .component-image-actions button {
+    width: 100%;
+  }
 }
 
 /* EIMS-F-012: Delete confirmation dialog */

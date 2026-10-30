@@ -851,36 +851,41 @@ function renderComponentDetails(component) {
   const editButton = ['ADMIN', 'MANAGER'].includes(role)
     ? '<button class="details-edit-button" type="button" data-edit-component>Edit details</button>'
     : '';
-
   const imageSection = component.image_url
-  ? `
-    <div class="component-image-section">
-      <img
-        class="component-image"
-        src="${escapeHTML(component.image_url)}"
-        alt="${escapeHTML(component.name)}"
-        loading="lazy"
-      >
-    </div>
-  `
-  : '<p class="no-component-image">No image uploaded yet.</p>';
+    ? `
+      <div class="component-image-section">
+        <img
+          class="component-image"
+          src="${escapeHTML(component.image_url)}"
+          alt="${escapeHTML(component.name)}"
+          loading="lazy"
+        >
+      </div>
+    `
+    : '<p class="no-component-image">No image uploaded yet.</p>';
 
-const imageUploadSection = ['ADMIN', 'MANAGER'].includes(role)
-  ? `
-    <form id="component-image-form" class="component-image-form">
-      <label for="component-image-file">Component image (PNG, JPEG, or WebP; max 5 MB)</label>
-      <input
-        id="component-image-file"
-        name="file"
-        type="file"
-        accept="image/png,image/jpeg,image/webp"
-        required
-      >
-      <p id="component-image-feedback" class="form-feedback" role="status" aria-live="polite"></p>
-      <button type="submit">Upload image</button>
-    </form>
-  `
-  : '';  
+  const imageUploadSection = ['ADMIN', 'MANAGER'].includes(role)
+    ? `
+      <form id="component-image-form" class="component-image-form">
+        <label for="component-image-file">
+          ${component.image_url ? 'Replace component image' : 'Upload component image'}
+          (PNG, JPEG, or WebP; max 5 MB)
+        </label>
+        <input
+          id="component-image-file"
+          name="file"
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          required
+        >
+        <p id="component-image-feedback" class="form-feedback" role="status" aria-live="polite"></p>
+        <div class="component-image-actions">
+          <button type="submit">Upload image</button>
+          ${component.image_url ? '<button type="button" id="remove-component-image" class="danger-button">Remove image</button>' : ''}
+        </div>
+      </form>
+    `
+    : '';
 
   details.innerHTML = `
         ${imageSection}
@@ -920,6 +925,35 @@ const imageUploadSection = ['ADMIN', 'MANAGER'].includes(role)
     ${editButton}
   `;
   const imageForm = $('component-image-form');
+
+  const removeImageButton = $('remove-component-image');
+
+if (removeImageButton) {
+  removeImageButton.addEventListener('click', async () => {
+    const feedback = $('component-image-feedback');
+
+    removeImageButton.disabled = true;
+    feedback.textContent = 'Removing image...';
+
+    try {
+      const result = await api(
+        `/api/inventory/${component.id}/image`,
+        { method: 'DELETE' }
+      );
+
+      currentComponent = await api(`/api/inventory/${component.id}`);
+      renderComponentDetails(currentComponent);
+
+      const updatedFeedback = $('component-image-feedback');
+      if (updatedFeedback) {
+        updatedFeedback.textContent = result.message || 'Image removed successfully.';
+      }
+    } catch (error) {
+      feedback.textContent = `Image removal failed: ${error.message}`;
+      removeImageButton.disabled = false;
+    }
+  });
+}
 
 if (imageForm) {
   imageForm.addEventListener('submit', async event => {
@@ -962,11 +996,14 @@ if (imageForm) {
         }
       );
 
-      feedback.textContent = result.message || 'Image uploaded successfully.';
-
       // Reload the component to display its latest saved image.
       currentComponent = await api(`/api/inventory/${component.id}`);
       renderComponentDetails(currentComponent);
+
+      const updatedFeedback = $('component-image-feedback');
+      if (updatedFeedback) {
+        updatedFeedback.textContent = result.message || 'Image uploaded successfully.';
+      }
     } catch (error) {
       feedback.textContent = `Image upload failed: ${error.message}`;
     } finally {
