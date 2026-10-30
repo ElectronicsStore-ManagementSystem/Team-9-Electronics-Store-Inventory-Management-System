@@ -297,6 +297,56 @@ async def upload_component_image(
         "image_url": component.image_url,
     }
 
+@app.delete("/api/inventory/{component_id}/image")
+def remove_component_image(
+    component_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_manager),
+):
+    component = repositories.get_active_component(db, component_id)
+
+    if not component:
+        raise HTTPException(
+            status_code=404,
+            detail="Component not found or inactive.",
+        )
+
+    old_image_url = component.image_url
+
+    if not old_image_url:
+        raise HTTPException(
+            status_code=404,
+            detail="No image is currently uploaded for this component.",
+        )
+
+    try:
+        component.image_url = None
+        db.commit()
+        db.refresh(component)
+
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="Image removal failed. The existing image was preserved.",
+        ) from exc
+
+    if old_image_url.startswith("/uploads/components/"):
+        old_filename = Path(old_image_url).name
+        old_path = UPLOAD_DIR / old_filename
+
+        if old_path.is_file():
+            try:
+                old_path.unlink()
+            except OSError:
+                pass
+
+    return {
+        "message": "Component image removed successfully.",
+        "component_id": component.id,
+        "image_url": None,
+    }
+
 @app.get("/api/inventory/{component_id}", response_model=ComponentResponse)
 def get_component(
     component_id: int,
