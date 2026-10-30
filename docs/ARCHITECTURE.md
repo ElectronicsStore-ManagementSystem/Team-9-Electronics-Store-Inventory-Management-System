@@ -42,8 +42,10 @@ Responsibilities include:
 * Displaying inventory components.
 * Searching, filtering, and sorting inventory.
 * Adding and updating components.
+* Managing suppliers and loading category/supplier filter options.
 * Displaying stock classifications.
 * Showing dashboard information.
+* Switching between persistent light and dark themes.
 * Displaying reports and handling supported exports.
 * Displaying validation messages and API errors.
 
@@ -60,6 +62,7 @@ Responsibilities include:
 * Enforcing authentication and authorization.
 * Managing inventory operations.
 * Generating unique SKUs.
+* Managing the supplier catalog and providing dynamic filter options.
 * Providing dashboard information.
 * Generating stock availability reports.
 * Calculating monthly system availability from monitoring records.

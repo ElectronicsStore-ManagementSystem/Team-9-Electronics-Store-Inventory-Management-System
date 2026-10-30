@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
-from .models import AuditLog, Component, User
+from .models import AuditLog, Component, Supplier, User
 
 
 def find_user_by_username(db: Session, username: str) -> User | None:
@@ -89,6 +89,50 @@ def list_components(
 
 def list_active_components(db: Session) -> list[Component]:
     return list(db.scalars(select(Component).where(Component.active.is_(True))))
+
+def list_categories(db: Session) -> list[str]:
+    return list(
+        db.scalars(
+            select(Component.category)
+            .where(Component.active.is_(True))
+            .distinct()
+            .order_by(func.lower(Component.category))
+        )
+    )
+
+
+def list_suppliers(db: Session) -> list[str]:
+    names_by_normalized: dict[str, str] = {}
+    supplier_names = db.scalars(
+        select(Supplier.name).order_by(func.lower(Supplier.name))
+    )
+    component_names = db.scalars(
+        select(Component.supplier).distinct().order_by(
+            func.lower(Component.supplier)
+        )
+    )
+
+    for name in supplier_names:
+        names_by_normalized.setdefault(name.casefold(), name)
+    for name in component_names:
+        names_by_normalized.setdefault(name.casefold(), name)
+
+    return sorted(names_by_normalized.values(), key=str.casefold)
+
+
+def create_supplier(db: Session, name: str) -> Supplier:
+    normalized_name = name.casefold()
+    if any(
+        existing_name.casefold() == normalized_name
+        for existing_name in list_suppliers(db)
+    ):
+        raise ValueError("A supplier with this name already exists.")
+
+    supplier = Supplier(name=name, normalized_name=normalized_name)
+    db.add(supplier)
+    db.commit()
+    db.refresh(supplier)
+    return supplier
 
 
 def get_active_component(db: Session, component_id: int) -> Component | None:

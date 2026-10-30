@@ -63,7 +63,25 @@ The response can include inventory summary information, stock values, low-stock 
 
 Refer to `/docs` for the exact response schema.
 
-## 5. Stock Availability Report
+## 5. Supplier and Filter Options
+
+### Supplier Collection
+
+**Endpoint:** `/api/suppliers`
+
+Authenticated users can list suppliers. Admins and managers can add a supplier
+with `POST /api/suppliers` using a JSON body containing a required `name`.
+Names are trimmed and duplicates are rejected. Existing component supplier
+values are included so current inventory remains available in filters.
+
+### Category Options
+
+**Endpoint:** `/api/categories`
+
+Authenticated users can retrieve the categories used by active inventory.
+New categories appear when components are added.
+
+## 6. Stock Availability Report
 
 **Endpoint:** `/api/reports/availability`
 
@@ -85,7 +103,7 @@ The export endpoint is:
 
 The exact supported query parameters and response formats are documented in `/docs`.
 
-## 6. Monthly System Availability Report
+## 7. Monthly System Availability Report
 
 **Endpoint:** `/api/reports/system-availability`
 
@@ -113,7 +131,7 @@ When monitoring coverage is incomplete, the response indicates that a definitive
 
 Access is subject to the application's authentication and authorization requirements.
 
-## 7. Error Handling
+## 8. Error Handling
 
 The API uses HTTP status codes to communicate request outcomes.
 
@@ -128,7 +146,7 @@ Depending on the endpoint and the type of failure, responses may indicate:
 
 Refer to `/docs` for endpoint-specific response details.
 
-## 8. Interactive Documentation
+## 9. Interactive Documentation
 
 Start the application and open:
 
