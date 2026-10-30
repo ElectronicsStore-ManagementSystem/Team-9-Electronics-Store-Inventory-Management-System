@@ -27,12 +27,13 @@ The application also includes monthly system availability reporting based on mon
 
 * List and view inventory components.
 * Search components by supported fields.
-* Filter inventory by category, supplier, and stock status.
+* Filter inventory by category, supplier, branch, and stock status.
 * Sort inventory using supported fields and sort orders.
 * Add new components with input validation.
-* Add and view suppliers; supplier choices are shared with component forms and inventory filters.
+* Manage shop branches and assign each component to one branch.
+* Keep supplier/vendor details for components; supplier choices are shared with forms and filters.
 * Generate unique SKUs for inventory components.
-* Update component quantity, unit price, supplier, and reorder level.
+* Update component quantity, unit price, supplier, branch, and reorder level.
 * Delete components with appropriate authorization and UI confirmation.
 * Classify inventory stock into:
 
