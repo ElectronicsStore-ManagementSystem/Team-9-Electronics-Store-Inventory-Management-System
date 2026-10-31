@@ -414,8 +414,19 @@
               placeholder="Enter component name"
               required
               maxlength="120"
+              autocomplete="off"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-controls="component-name-suggestions"
+              aria-expanded="false"
               aria-describedby="name-help name-error"
             >
+            <div
+              id="component-name-suggestions"
+              class="autocomplete-suggestions hidden"
+              role="listbox"
+              aria-label="Component name suggestions"
+            ></div>
             <small id="name-help" class="field-help">Use the name printed on the component or packaging.</small>
             <span id="name-error" class="field-error" aria-live="polite"></span>
           </label>

@@ -572,15 +572,181 @@ function displayValidationErrors(details) {
 $('add-btn').onclick = () => {
   $('add-feedback').classList.add('hidden');
   $('add-feedback').textContent = '';
+  hideComponentSuggestions();
+  loadComponentNameSuggestions();
   $('form-card').showModal();
   $('component-form').elements.namedItem('name').focus();
 };
 
+// ==================== COMPONENT NAME AUTOCOMPLETE ====================
+
+const componentNameInput =
+  $('component-form').elements.namedItem('name');
+
+const componentNameSuggestions =
+  $('component-name-suggestions');
+
+let existingComponentNames = [];
+let activeSuggestionIndex = -1;
+
+async function loadComponentNameSuggestions() {
+  try {
+    const components = await api('/api/inventory');
+
+    existingComponentNames = components
+      .map(component => ({
+        name: component.name,
+        category: component.category,
+        sku: component.sku
+      }))
+      .filter(component => component.name);
+  } catch (error) {
+    existingComponentNames = [];
+  }
+}
+
+function hideComponentSuggestions() {
+  componentNameSuggestions.classList.add('hidden');
+  componentNameSuggestions.replaceChildren();
+  componentNameInput.setAttribute('aria-expanded', 'false');
+  componentNameInput.removeAttribute('aria-activedescendant');
+  activeSuggestionIndex = -1;
+}
+
+function selectComponentSuggestion(component) {
+  componentNameInput.value = component.name;
+  componentNameInput.setCustomValidity('');
+  hideComponentSuggestions();
+  componentNameInput.focus();
+}
+
+function renderComponentSuggestions() {
+  const searchText = componentNameInput.value.trim().toLowerCase();
+
+  componentNameSuggestions.replaceChildren();
+  activeSuggestionIndex = -1;
+
+  if (!searchText) {
+    hideComponentSuggestions();
+    return;
+  }
+
+  const matches = existingComponentNames
+    .filter(component =>
+      component.name.toLowerCase().includes(searchText)
+    )
+    .sort((a, b) => {
+      const aStarts = a.name.toLowerCase().startsWith(searchText);
+      const bStarts = b.name.toLowerCase().startsWith(searchText);
+
+      return Number(bStarts) - Number(aStarts);
+    })
+    .slice(0, 6);
+
+  if (!matches.length) {
+    const message = document.createElement('div');
+    message.className = 'autocomplete-empty';
+    message.textContent = 'No matching components. You can add a new name.';
+    componentNameSuggestions.append(message);
+  } else {
+    matches.forEach((component, index) => {
+      const option = document.createElement('button');
+
+      option.type = 'button';
+      option.className = 'autocomplete-option';
+      option.id = `component-suggestion-${index}`;
+      option.setAttribute('role', 'option');
+      option.setAttribute('aria-selected', 'false');
+
+      const name = document.createElement('strong');
+      name.textContent = component.name;
+
+      const details = document.createElement('small');
+      details.textContent =
+        `${component.category} · ${component.sku}`;
+
+      option.append(name, details);
+
+      option.addEventListener('click', () => {
+        selectComponentSuggestion(component);
+      });
+
+      componentNameSuggestions.append(option);
+    });
+  }
+
+  componentNameSuggestions.classList.remove('hidden');
+  componentNameInput.setAttribute('aria-expanded', 'true');
+}
+
+componentNameInput.addEventListener('input', renderComponentSuggestions);
+
+componentNameInput.addEventListener('keydown', event => {
+  const options = componentNameSuggestions.querySelectorAll(
+    '.autocomplete-option'
+  );
+
+  if (componentNameSuggestions.classList.contains('hidden')) {
+    return;
+  }
+
+  if (event.key === 'ArrowDown' && options.length) {
+    event.preventDefault();
+    activeSuggestionIndex =
+      (activeSuggestionIndex + 1) % options.length;
+  } else if (event.key === 'ArrowUp' && options.length) {
+    event.preventDefault();
+    activeSuggestionIndex =
+      activeSuggestionIndex <= 0
+        ? options.length - 1
+        : activeSuggestionIndex - 1;
+  } else if (event.key === 'Enter' && activeSuggestionIndex >= 0) {
+    event.preventDefault();
+
+    const selected = existingComponentNames
+      .filter(component =>
+        component.name.toLowerCase().includes(
+          componentNameInput.value.trim().toLowerCase()
+        )
+      )
+      .sort((a, b) => {
+        const searchText = componentNameInput.value.trim().toLowerCase();
+        return Number(b.name.toLowerCase().startsWith(searchText)) -
+          Number(a.name.toLowerCase().startsWith(searchText));
+      })
+      .slice(0, 6)[activeSuggestionIndex];
+
+    if (selected) {
+      selectComponentSuggestion(selected);
+    }
+  } else if (event.key === 'Escape') {
+    hideComponentSuggestions();
+    return;
+  } else {
+    return;
+  }
+
+  options.forEach((option, index) => {
+    const isActive = index === activeSuggestionIndex;
+    option.setAttribute('aria-selected', String(isActive));
+
+    if (isActive) {
+      componentNameInput.setAttribute(
+        'aria-activedescendant',
+        option.id
+      );
+      option.scrollIntoView({ block: 'nearest' });
+    }
+  });
+});
+
 $('cancel-add').onclick = () => {
+  hideComponentSuggestions();
   $('component-form').reset();
   clearFieldErrors();
   $('form-card').close();
 };
+
 $('form-card').addEventListener('click', event => {
   if (event.target === $('form-card')) {
     $('form-card').close();
