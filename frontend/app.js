@@ -587,11 +587,21 @@ const componentNameSuggestions =
   $('component-name-suggestions');
 
 let existingComponentNames = [];
+let visibleComponentSuggestions = [];
 let activeSuggestionIndex = -1;
+let componentNamesLoaded = false;
 
 async function loadComponentNameSuggestions() {
+  componentNamesLoaded = false;
+
   try {
     const components = await api('/api/inventory');
+
+    console.log('Inventory API response:', components);
+
+    if (!Array.isArray(components)) {
+      throw new Error('Inventory API did not return an array.');
+    }
 
     existingComponentNames = components
       .map(component => ({
@@ -600,8 +610,16 @@ async function loadComponentNameSuggestions() {
         sku: component.sku
       }))
       .filter(component => component.name);
+
   } catch (error) {
+    console.error('Autocomplete inventory loading failed:', error);
     existingComponentNames = [];
+  } finally {
+    componentNamesLoaded = true;
+
+    if (componentNameInput.value.trim()) {
+      renderComponentSuggestions();
+    }
   }
 }
 
@@ -610,6 +628,8 @@ function hideComponentSuggestions() {
   componentNameSuggestions.replaceChildren();
   componentNameInput.setAttribute('aria-expanded', 'false');
   componentNameInput.removeAttribute('aria-activedescendant');
+
+  visibleComponentSuggestions = [];
   activeSuggestionIndex = -1;
 }
 
@@ -619,11 +639,11 @@ function selectComponentSuggestion(component) {
   hideComponentSuggestions();
   componentNameInput.focus();
 }
-
 function renderComponentSuggestions() {
   const searchText = componentNameInput.value.trim().toLowerCase();
 
   componentNameSuggestions.replaceChildren();
+  visibleComponentSuggestions = [];
   activeSuggestionIndex = -1;
 
   if (!searchText) {
@@ -631,25 +651,35 @@ function renderComponentSuggestions() {
     return;
   }
 
-  const matches = existingComponentNames
+  if (!componentNamesLoaded) {
+    const message = document.createElement('div');
+    message.className = 'autocomplete-empty';
+    message.textContent = 'Loading suggestions...';
+    componentNameSuggestions.append(message);
+    componentNameSuggestions.classList.remove('hidden');
+    componentNameInput.setAttribute('aria-expanded', 'true');
+    return;
+  }
+
+  visibleComponentSuggestions = existingComponentNames
     .filter(component =>
       component.name.toLowerCase().includes(searchText)
     )
     .sort((a, b) => {
       const aStarts = a.name.toLowerCase().startsWith(searchText);
       const bStarts = b.name.toLowerCase().startsWith(searchText);
-
       return Number(bStarts) - Number(aStarts);
     })
     .slice(0, 6);
 
-  if (!matches.length) {
+  if (!visibleComponentSuggestions.length) {
     const message = document.createElement('div');
     message.className = 'autocomplete-empty';
-    message.textContent = 'No matching components. You can add a new name.';
+    message.textContent =
+      'No matching components. You can add a new name.';
     componentNameSuggestions.append(message);
   } else {
-    matches.forEach((component, index) => {
+    visibleComponentSuggestions.forEach((component, index) => {
       const option = document.createElement('button');
 
       option.type = 'button';
@@ -681,6 +711,9 @@ function renderComponentSuggestions() {
 
 componentNameInput.addEventListener('input', renderComponentSuggestions);
 
+
+
+
 componentNameInput.addEventListener('keydown', event => {
   const options = componentNameSuggestions.querySelectorAll(
     '.autocomplete-option'
@@ -690,44 +723,49 @@ componentNameInput.addEventListener('keydown', event => {
     return;
   }
 
+  // Move down through suggestions
   if (event.key === 'ArrowDown' && options.length) {
     event.preventDefault();
+
     activeSuggestionIndex =
       (activeSuggestionIndex + 1) % options.length;
+
+  // Move up through suggestions
   } else if (event.key === 'ArrowUp' && options.length) {
     event.preventDefault();
+
     activeSuggestionIndex =
       activeSuggestionIndex <= 0
         ? options.length - 1
         : activeSuggestionIndex - 1;
-  } else if (event.key === 'Enter' && activeSuggestionIndex >= 0) {
+
+  // Select the highlighted suggestion
+  } else if (
+    event.key === 'Enter' &&
+    activeSuggestionIndex >= 0
+  ) {
     event.preventDefault();
 
-    const selected = existingComponentNames
-      .filter(component =>
-        component.name.toLowerCase().includes(
-          componentNameInput.value.trim().toLowerCase()
-        )
-      )
-      .sort((a, b) => {
-        const searchText = componentNameInput.value.trim().toLowerCase();
-        return Number(b.name.toLowerCase().startsWith(searchText)) -
-          Number(a.name.toLowerCase().startsWith(searchText));
-      })
-      .slice(0, 6)[activeSuggestionIndex];
+    const selected =
+      visibleComponentSuggestions[activeSuggestionIndex];
 
     if (selected) {
       selectComponentSuggestion(selected);
     }
+
+  // Close suggestions
   } else if (event.key === 'Escape') {
     hideComponentSuggestions();
     return;
+
   } else {
     return;
   }
 
+  // Update keyboard selection
   options.forEach((option, index) => {
     const isActive = index === activeSuggestionIndex;
+
     option.setAttribute('aria-selected', String(isActive));
 
     if (isActive) {
@@ -735,10 +773,13 @@ componentNameInput.addEventListener('keydown', event => {
         'aria-activedescendant',
         option.id
       );
+
       option.scrollIntoView({ block: 'nearest' });
     }
   });
 });
+
+
 
 $('cancel-add').onclick = () => {
   hideComponentSuggestions();
