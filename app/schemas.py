@@ -1,7 +1,5 @@
 from datetime import datetime
-
 from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator
-
 
 class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=80)
@@ -47,7 +45,6 @@ class BranchCreate(BaseModel):
 
 class BranchResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: int
     name: str
 
@@ -93,7 +90,6 @@ class ComponentCreate(BaseModel):
                 "Image URLs must be assigned through the image upload endpoint."
             )
         return None
-
     @field_validator("name", "category", "supplier", "branch")
     @classmethod
     def trim_text(cls, value: str) -> str:
@@ -138,8 +134,6 @@ class ComponentUpdate(BaseModel):
             raise ValueError("Branch cannot be blank")
 
         return value
-
-
 class ComponentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -181,8 +175,6 @@ class DashboardResponse(BaseModel):
     recently_added: list[ComponentResponse]
     category_stock: list[CategoryStockSummary]
     stock_trend: list[StockTrendPoint]
-
-
 class StockMovementCreate(BaseModel):
     movement_type: str = Field(
         pattern="^(STOCK_IN|STOCK_OUT)$",

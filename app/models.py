@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
 from .db import Base
 
 
@@ -25,7 +24,6 @@ class Supplier(Base):
 
 class Branch(Base):
     __tablename__ = "branches"
-
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     normalized_name: Mapped[str] = mapped_column(
@@ -159,7 +157,6 @@ class StockMovement(Base):
     __tablename__ = "stock_movements"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
     component_id: Mapped[int] = mapped_column(
         ForeignKey("components.id"),
         nullable=False,
@@ -190,10 +187,7 @@ class StockMovement(Base):
         ForeignKey("users.id"),
         nullable=False,
     )
-
     actor: Mapped["User"] = relationship()
-
-
 class PurchaseOrder(Base):
     __tablename__ = "purchase_orders"
 
@@ -223,12 +217,10 @@ class PurchaseOrder(Base):
         ForeignKey("users.id"),
         nullable=False,
     )
-
     items: Mapped[list["PurchaseOrderItem"]] = relationship(
-        back_populates="purchase_order",
-        cascade="all, delete-orphan",
-    )
-
+    back_populates="purchase_order",
+    cascade="all, delete-orphan",
+)
 
 class PurchaseOrderItem(Base):
     __tablename__ = "purchase_order_items"
@@ -261,7 +253,6 @@ class PurchaseOrderItem(Base):
         back_populates="purchase_order_item",
         cascade="all, delete-orphan",
     )
-
 
 class PurchaseOrderReceipt(Base):
     __tablename__ = "purchase_order_receipts"

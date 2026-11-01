@@ -1,3 +1,4 @@
+
 from collections.abc import Sequence
 import uuid
 
@@ -15,6 +16,7 @@ from .models import (
     Supplier,
     User,
 )
+
 
 def find_user_by_username(db: Session, username: str) -> User | None:
     return db.scalar(select(User).where(User.username == username))
@@ -46,6 +48,7 @@ def list_components(
 ) -> list[Component]:
     descending = sort.startswith("-")
     sort_field = sort[1:] if descending else sort
+
     sort_options = {
         "name": func.lower(Component.name),
         "quantity": Component.quantity,
@@ -53,6 +56,7 @@ def list_components(
         "price": Component.unit_price,
         "id": Component.id,
     }
+
     if allow_date_sort:
         sort_options.update({
             "date_added": Component.created_at,
@@ -60,35 +64,47 @@ def list_components(
         })
 
     sort_column = sort_options.get(sort_field)
+
     if sort_column is None:
         raise ValueError("Unsupported inventory sort field")
 
     query = select(Component).where(Component.active.is_(True))
+
     if search:
         term = f"%{search}%"
+
         search_conditions = [
             Component.name.ilike(term),
             Component.sku.ilike(term),
             Component.category.ilike(term),
         ]
+
         category_aliases = {
             "microprocessor": "microcontroller",
             "microprocessors": "microcontroller",
         }
+
         category_alias = category_aliases.get(search.casefold())
+
         if category_alias:
             search_conditions.append(
                 Component.category.ilike(f"%{category_alias}%")
             )
+
         query = query.where(or_(*search_conditions))
+
     if category:
         query = query.where(Component.category == category)
+
     if supplier:
         query = query.where(Component.supplier == supplier)
+
     if branch:
         query = query.where(Component.branch == branch)
+
     if status == "out-of-stock":
         query = query.where(Component.quantity == 0)
+
     elif status == "low-stock":
         query = query.where(
             and_(
@@ -96,20 +112,30 @@ def list_components(
                 Component.quantity <= Component.reorder_level,
             )
         )
+
     elif status == "in-stock":
-        query = query.where(Component.quantity > Component.reorder_level)
+        query = query.where(
+            Component.quantity > Component.reorder_level
+        )
 
     query = query.order_by(
         sort_column.desc() if descending else sort_column.asc(),
         Component.id.asc(),
     )
+
     if limit is not None:
         query = query.limit(limit).offset(offset)
+
     return list(db.scalars(query))
 
 
 def list_active_components(db: Session) -> list[Component]:
-    return list(db.scalars(select(Component).where(Component.active.is_(True))))
+    return list(
+        db.scalars(
+            select(Component).where(Component.active.is_(True))
+        )
+    )
+
 
 def list_categories(db: Session) -> list[str]:
     return list(
@@ -124,42 +150,63 @@ def list_categories(db: Session) -> list[str]:
 
 def list_suppliers(db: Session) -> list[str]:
     names_by_normalized: dict[str, str] = {}
+
     supplier_names = db.scalars(
         select(Supplier.name).order_by(func.lower(Supplier.name))
     )
+
     component_names = db.scalars(
-        select(Component.supplier).distinct().order_by(
-            func.lower(Component.supplier)
-        )
+        select(Component.supplier)
+        .distinct()
+        .order_by(func.lower(Component.supplier))
     )
 
     for name in supplier_names:
         names_by_normalized.setdefault(name.casefold(), name)
+
     for name in component_names:
         names_by_normalized.setdefault(name.casefold(), name)
 
-    return sorted(names_by_normalized.values(), key=str.casefold)
+    return sorted(
+        names_by_normalized.values(),
+        key=str.casefold,
+    )
 
 
 def list_supplier_records(db: Session) -> list[Supplier]:
     return list(
         db.scalars(
-            select(Supplier).order_by(func.lower(Supplier.name), Supplier.id)
+            select(Supplier).order_by(
+                func.lower(Supplier.name),
+                Supplier.id,
+            )
         )
     )
+
+
 def create_supplier(db: Session, name: str) -> Supplier:
     normalized_name = name.casefold()
+
     if any(
         existing_name.casefold() == normalized_name
         for existing_name in list_suppliers(db)
     ):
         raise ValueError("A supplier with this name already exists.")
 
-    supplier = Supplier(name=name, normalized_name=normalized_name)
+    supplier = Supplier(
+        name=name,
+        normalized_name=normalized_name,
+    )
+
     db.add(supplier)
     db.commit()
     db.refresh(supplier)
+
     return supplier
+
+
+# ---------------- BRANCH REPOSITORIES ----------------
+
 
 def list_branches(db: Session) -> list[str]:
     return list(
@@ -173,13 +220,18 @@ def create_branch(db: Session, name: str) -> Branch:
     normalized_name = name.casefold()
 
     existing = db.scalar(
-        select(Branch).where(Branch.normalized_name == normalized_name)
+        select(Branch).where(
+            Branch.normalized_name == normalized_name
+        )
     )
 
     if existing is not None:
         raise ValueError("A branch with this name already exists.")
 
-    branch = Branch(name=name, normalized_name=normalized_name)
+    branch = Branch(
+        name=name,
+        normalized_name=normalized_name,
+    )
 
     db.add(branch)
     db.commit()
@@ -188,35 +240,54 @@ def create_branch(db: Session, name: str) -> Branch:
     return branch
 
 
-def find_branch_by_name(db: Session, name: str) -> Branch | None:
+def find_branch_by_name(
+    db: Session,
+    name: str,
+) -> Branch | None:
     return db.scalar(
-        select(Branch).where(Branch.normalized_name == name.casefold())
+        select(Branch).where(
+            Branch.normalized_name == name.casefold()
+        )
     )
 
-def get_active_component(db: Session, component_id: int) -> Component | None:
+
+def get_active_component(
+    db: Session,
+    component_id: int,
+) -> Component | None:
     component = db.get(Component, component_id)
+
     if component is None or not component.active:
         return None
+
     return component
 
 
-def create_component(db: Session, values: dict) -> Component:
+def create_component(
+    db: Session,
+    values: dict,
+) -> Component:
     last_id = db.scalar(select(func.max(Component.id)))
     number = (last_id or 0) + 1
 
     while True:
         sku = f"EIMS-{number:05d}"
+
         existing_id = db.scalar(
             select(Component.id).where(Component.sku == sku)
         )
+
         if existing_id is None:
             break
+
         number += 1
 
     component = Component(sku=sku, **values)
+
     db.add(component)
     db.commit()
     db.refresh(component)
+
     return component
 
 
@@ -227,8 +298,10 @@ def update_component(
 ) -> Component:
     for key, value in values.items():
         setattr(component, key, value)
+
     db.commit()
     db.refresh(component)
+
     return component
 
 
@@ -244,8 +317,15 @@ def deactivate_component(
 
 def list_audit_logs(db: Session) -> list[AuditLog]:
     return list(
-        db.scalars(select(AuditLog).order_by(AuditLog.timestamp.desc()))
+        db.scalars(
+            select(AuditLog).order_by(
+                AuditLog.timestamp.desc()
+            )
+        )
     )
+
+
+# ---------------- DASHBOARD REPOSITORIES ----------------
 
 
 def get_dashboard_summary(db: Session) -> dict:
@@ -256,39 +336,47 @@ def get_dashboard_summary(db: Session) -> dict:
         Component.quantity <= Component.reorder_level,
     )
 
-    # Calculate overall statistics in one database query.
     totals = db.execute(
         select(
             func.count(Component.id),
             func.coalesce(
-                func.sum(Component.quantity * Component.unit_price), 0
+                func.sum(
+                    Component.quantity * Component.unit_price
+                ),
+                0,
             ),
             func.coalesce(
-                func.sum(case((low_stock_condition, 1), else_=0)), 0
+                func.sum(
+                    case((low_stock_condition, 1), else_=0)
+                ),
+                0,
             ),
         ).where(Component.active.is_(True))
     ).one()
 
-    # Get low-stock components only.
     low_stock_components = list(
         db.scalars(
             select(Component)
-            .where(Component.active.is_(True), low_stock_condition)
+            .where(
+                Component.active.is_(True),
+                low_stock_condition,
+            )
             .order_by(Component.id)
         )
     )
 
-    # Fetch only the five most recently added components.
     recently_added = list(
         db.scalars(
             select(Component)
             .where(Component.active.is_(True))
-            .order_by(Component.created_at.desc(), Component.id.asc())
+            .order_by(
+                Component.created_at.desc(),
+                Component.id.asc(),
+            )
             .limit(5)
         )
     )
 
-    # Calculate stock totals category-wise in SQL.
     category_rows = db.execute(
         select(
             Component.category,
@@ -300,7 +388,6 @@ def get_dashboard_summary(db: Session) -> dict:
         .order_by(Component.category)
     ).all()
 
-    # Calculate daily stock trends in SQL.
     date_column = func.date(Component.created_at)
 
     trend_rows = db.execute(
@@ -330,13 +417,21 @@ def get_dashboard_summary(db: Session) -> dict:
         ],
         "stock_trend": [
             {
-                "date": date.isoformat() if hasattr(date, "isoformat") else str(date),
+                "date": (
+                    date.isoformat()
+                    if hasattr(date, "isoformat")
+                    else str(date)
+                ),
                 "quantity": quantity,
                 "component_count": count,
             }
             for date, quantity, count in trend_rows
         ],
     }
+
+
+# ---------------- STOCK MOVEMENT REPOSITORIES ----------------
+
 
 def create_stock_movement(
     db: Session,
@@ -357,6 +452,7 @@ def create_stock_movement(
     )
 
     db.add(movement)
+
     return movement
 
 
@@ -369,12 +465,16 @@ def list_stock_movements(
             select(StockMovement)
             .options(joinedload(StockMovement.actor))
             .where(StockMovement.component_id == component_id)
-            .order_by(StockMovement.timestamp.desc(), StockMovement.id.desc())
+            .order_by(
+                StockMovement.timestamp.desc(),
+                StockMovement.id.desc(),
+            )
         )
     )
 
 
 # ---------------- PURCHASE ORDER REPOSITORIES ----------------
+
 
 def create_purchase_order(
     db: Session,
@@ -382,7 +482,6 @@ def create_purchase_order(
     user: User,
     items: list[dict],
 ) -> PurchaseOrder:
-
     order_number = f"PO-{uuid.uuid4().hex[:12].upper()}"
 
     purchase_order = PurchaseOrder(
@@ -406,6 +505,7 @@ def create_purchase_order(
         )
 
     db.flush()
+
     return purchase_order
 
 
@@ -413,14 +513,12 @@ def get_purchase_order(
     db: Session,
     purchase_order_id: int,
 ) -> PurchaseOrder | None:
-
     return db.get(PurchaseOrder, purchase_order_id)
 
 
 def list_purchase_orders(
     db: Session,
 ) -> list[PurchaseOrder]:
-
     return list(
         db.query(PurchaseOrder)
         .order_by(PurchaseOrder.order_date.desc())
@@ -433,9 +531,9 @@ def update_purchase_order_status(
     purchase_order: PurchaseOrder,
     status: str,
 ) -> PurchaseOrder:
-
     purchase_order.status = status
     db.flush()
+
     return purchase_order
 
 
@@ -446,7 +544,6 @@ def create_purchase_order_receipt(
     user: User,
     idempotency_key: str,
 ) -> PurchaseOrderReceipt:
-
     receipt = PurchaseOrderReceipt(
         purchase_order_item_id=purchase_order_item.id,
         received_quantity=quantity,
@@ -456,6 +553,7 @@ def create_purchase_order_receipt(
 
     db.add(receipt)
     db.flush()
+
     return receipt
 
 
@@ -463,7 +561,6 @@ def list_purchase_order_receipts(
     db: Session,
     purchase_order_id: int,
 ) -> list[PurchaseOrderReceipt]:
-
     return list(
         db.query(PurchaseOrderReceipt)
         .join(

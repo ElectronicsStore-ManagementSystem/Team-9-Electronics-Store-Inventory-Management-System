@@ -100,6 +100,12 @@ Returns persisted supplier records, including IDs, for purchase-order creation.
 
 This is separate from `/api/suppliers`, which returns names for inventory filters and may include legacy supplier values from components.
 
+**Endpoint:** `/api/suppliers/catalog`
+
+Returns persisted supplier records, including IDs, for purchase-order creation.
+This is separate from `/api/suppliers`, which returns names for inventory
+filters and may include legacy supplier values from components.
+
 ### Category Options
 
 **Endpoint:** `/api/categories`
@@ -122,7 +128,6 @@ Purchase orders can be created by admins and managers. Authenticated users can v
 | `GET` | `/api/purchase-orders/{id}/receipts` | View the order's receipt history. |
 
 Receiving updates inventory and records receipts in the same transaction.
-
 Repeated idempotency keys are rejected to prevent duplicate stock updates.
 
 ## 7. Stock Availability Report
