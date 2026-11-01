@@ -2,6 +2,8 @@
 
 **Team 9 | Electronics Store Inventory Management System**
 
+**Application/API version:** `1.0.0`
+
 ## Team Members 
 
 1. Krishitha Kanakala ---PES2UG24CS234
@@ -30,16 +32,39 @@ The application also includes monthly system availability reporting based on mon
 * Filter inventory by category, supplier, branch, and stock status.
 * Sort inventory using supported fields and sort orders.
 * Add new components with input validation.
+* Add and view suppliers; supplier choices are shared with component forms and inventory filters.
 * Manage shop branches and assign each component to one branch.
 * Keep supplier/vendor details for components; supplier choices are shared with forms and filters.
 * Generate unique SKUs for inventory components.
-* Update component quantity, unit price, supplier, branch, and reorder level.
+* Record stock-in and stock-out operations with a reason and retrieve each component's movement history.
+* Update component unit price, supplier, branch, and reorder level.
 * Delete components with appropriate authorization and UI confirmation.
 * Classify inventory stock into:
 
   * In stock
   * Low stock
   * Out of stock
+* Create purchase orders for suppliers, track order status and partial deliveries, and record received quantities directly in inventory.
+
+#### Component Images
+
+Admins and managers can upload PNG, JPEG, or WebP component images (up to 5 MB).
+Image files are stored under `uploads/components/`, and the saved image URL is
+associated with the component. Replacing or removing an image updates the
+stored file and component reference.
+
+Uploaded images are runtime data and are excluded from Git. Keep the
+`uploads/components/` directory on persistent storage and include it in
+application backups; ephemeral hosting storage may be cleared when an instance
+is replaced.
+
+#### Stock Movement History
+
+Admins and managers can record stock additions or deductions with a positive
+quantity and a required reason. Each adjustment updates inventory and is stored
+in the component's movement history. Authenticated users can retrieve the
+history, which includes the movement type, quantity, reason, timestamp, and
+responsible user ID.
 
 ### 3. Dashboard and Inventory Insights
 
@@ -236,7 +261,9 @@ The following endpoints represent the principal documented API capabilities. Che
 | `/api/auth/login`                  | Authenticate a user and obtain an access token.                             |
 | `/api/inventory`                   | Access the inventory collection and supported inventory operations.         |
 | `/api/inventory/{id}`              | Access or modify an individual inventory component, subject to permissions. |
+| `/api/inventory/{id}/movements`    | Record or retrieve stock movement history, subject to permissions.            |
 | `/api/dashboard`                   | Retrieve dashboard summary information.                                     |
+| `/api/purchase-orders`             | Create and track supplier orders and received stock.                         |
 | `/api/reports/availability`        | Retrieve the stock availability report.                                     |
 | `/api/reports/system-availability` | Retrieve monthly system availability information using monitoring data.     |
 
@@ -284,6 +311,13 @@ The application is organized into components responsible for:
 For the current module structure and request flow, refer to [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 For endpoint details, refer to [docs/API.md](docs/API.md) and the interactive API documentation at `/docs`.
+
+## Sprint History
+
+| Sprint | Focus |
+| ------ | ----- |
+| Sprint 1 | Initialize the EIMS project baseline. |
+| Sprint 2 | Core inventory and authentication, suppliers, purchase orders, stock movement history, and UI enhancements. |
 
 ## Sprint and Git Workflow
 
