@@ -95,12 +95,16 @@ def test_availability_report_reflects_updated_quantity(client, admin_token):
     )
 
     # Change its quantity to zero.
-    update = client.patch(
-        f"/api/inventory/{arduino['id']}",
-        json={"quantity": 0},
-        headers=headers,
-    )
-    assert update.status_code == 200
+    update = client.post(
+    f"/api/inventory/{arduino['id']}/movements",
+    json={
+        "movement_type": "STOCK_OUT",
+        "quantity": arduino["quantity"],
+        "reason": "Testing availability report after stock depletion",
+    },
+    headers=headers,
+)
+    assert update.status_code == 201
 
     # The report should show the updated quantity and status.
     report = client.get("/api/reports/availability", headers=headers)
@@ -203,10 +207,12 @@ def test_export_availability_report_as_csv(client, admin_token):
 
     assert rows[0] == [
         "SKU", "Name", "Category", "Quantity",
-        "Unit Price", "Supplier", "Reorder Level", "Stock Status"
+        "Unit Price", "Supplier", "Branch", "Reorder Level", "Stock Status"
     ]
     assert len(rows) > 1
     assert any(row[1] == "Arduino Uno" for row in rows[1:])
+    arduino_row = next(row for row in rows[1:] if row[1] == "Arduino Uno")
+    assert arduino_row[6] == "Main Branch"
 
 
 def test_export_availability_report_as_excel(client, admin_token):

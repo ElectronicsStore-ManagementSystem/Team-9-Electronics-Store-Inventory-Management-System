@@ -1,5 +1,6 @@
 
 from datetime import datetime, timedelta, timezone
+from unittest.mock import patch
 
 from app.db import SessionLocal
 from app.models import AvailabilityCheck, DowntimeIncident, MaintenanceWindow
@@ -202,3 +203,69 @@ def test_system_availability_marks_incomplete_coverage(
     assert data["target_met"] is None
     assert "coverage is incomplete" in data["message"]
 
+
+
+
+def test_system_availability_calculates_unplanned_downtime(
+    client, admin_token
+):
+    db = SessionLocal()
+
+    try:
+        month_start = datetime(2025, 1, 1, tzinfo=timezone.utc)
+        month_end = datetime(2025, 2, 1, tzinfo=timezone.utc)
+
+        downtime_start = datetime(2025, 1, 10, tzinfo=timezone.utc)
+        downtime_end = downtime_start + timedelta(hours=5)
+
+        db.add_all([
+            AvailabilityCheck(
+                checked_at=month_start,
+                is_available=True,
+            ),
+            AvailabilityCheck(
+                checked_at=month_end - timedelta(seconds=1),
+                is_available=True,
+            ),
+            DowntimeIncident(
+                started_at=downtime_start,
+                ended_at=downtime_end,
+                reason="Unexpected server outage",
+            ),
+        ])
+
+        db.commit()
+    finally:
+        db.close()
+
+    response = client.get(
+        ENDPOINT,
+        params={"year": 2025, "month": 1},
+        headers=auth(admin_token),
+    )
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["coverage_complete"] is True
+    assert data["unplanned_downtime_seconds"] == 18000.0
+    assert data["availability_percentage"] < 99.5
+    assert data["target_met"] is False
+
+
+
+def test_system_availability_handles_unexpected_reporting_error(
+    client, admin_token
+):
+    with patch(
+        "app.main.Session.query",
+        side_effect=RuntimeError("Simulated database failure"),
+    ):
+        response = client.get(
+            ENDPOINT,
+            params={"year": 2025, "month": 1},
+            headers=auth(admin_token),
+        )
+
+    assert response.status_code == 500

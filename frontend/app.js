@@ -1,5 +1,6 @@
 let token = localStorage.getItem('eims_token');
 let role = localStorage.getItem('eims_role');
+let availableBranches = [];
 
 const $ = id => document.getElementById(id);
 
@@ -26,8 +27,7 @@ $('theme-toggle').onclick = () => {
   applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
 };
 
-// ==================== AVAILABILITY REPORT EXPORTS ====================
-
+// ==================== AVAILABILITY REPORT EXPORTS =============
 async function exportAvailabilityReport(format) {
   const status = $('report-status').value;
   const query = new URLSearchParams({ format });
@@ -76,8 +76,7 @@ $('export-excel').onclick = () => exportAvailabilityReport('excel');
 $('export-csv').onclick = () => exportAvailabilityReport('csv');
 
 
-// ==================== API HELPER ====================
-
+// ==================== API HELPER =============
 async function api(path, options = {}) {
   options.headers = {
     ...(options.headers || {}),
@@ -115,8 +114,7 @@ async function api(path, options = {}) {
 }
 
 
-// ==================== LOGIN / LOGOUT ====================
-
+// ==================== LOGIN / LOGOUT =============
 function setLoggedIn() {
   $('login-card').classList.toggle('hidden', !!token);
   $('app').classList.toggle('hidden', !token);
@@ -138,13 +136,21 @@ function setLoggedIn() {
     'hidden',
     !['ADMIN', 'MANAGER'].includes(role)
   );
+  $('branch-btn').classList.toggle(
+    'hidden',
+    !['ADMIN', 'MANAGER'].includes(role)
+  );
+  $('create-purchase-order-btn').classList.toggle(
+    'hidden',
+    !['ADMIN', 'MANAGER'].includes(role)
+  );
   const isStaff = role === 'STAFF';
   $('dashboard-role').textContent = isStaff
     ? 'Staff · Read-only view'
     : `${role === 'ADMIN' ? 'Admin' : 'Manager'} · Full view`;
   $('dashboard-description').textContent = isStaff
-    ? 'Review inventory, stock levels, and suppliers. Changes require a manager.'
-    : 'Track and manage components, stock levels, and suppliers.';
+    ? 'Review inventory, stock levels, and shop branches. Changes require a manager.'
+    : 'Track components and manage stock across shop branches.';
   $('quick-start-add-step').innerHTML = ['ADMIN', 'MANAGER'].includes(role)
     ? '<strong>Add it:</strong> choose <strong>Add component</strong> and complete the form.'
     : '<strong>Add it:</strong> ask a manager to add new stock; you can search and review components here.';
@@ -198,7 +204,12 @@ $('logout').onclick = () => {
   $('trend-chart').innerHTML = '';
   $('low-stock-alert').classList.add('hidden');
   $('low-stock-alert-items').innerHTML = '';
-  $('form-card').classList.add('hidden');
+  $('purchase-orders-section').classList.add('hidden');
+  $('purchase-orders-list').replaceChildren();
+  $('purchase-orders-feedback').textContent = '';
+  if ($('form-card').open) $('form-card').close();
+  if ($('branch-card').open) $('branch-card').close();
+  if ($('purchase-order-dialog').open) $('purchase-order-dialog').close();
   $('add-feedback').classList.add('hidden');
   $('add-feedback').textContent = '';
 
@@ -207,20 +218,102 @@ $('logout').onclick = () => {
 
 $('refresh').onclick = refresh;
 let searchTimer;
+let searchRefreshTimer;
+$('search-results-list').addEventListener('click', event => {
+  const componentButton = event.target.closest('[data-component-id]');
+  if (componentButton) {
+    showComponentDetails(componentButton.dataset.componentId);
+  }
+});
+$('search-results-list').addEventListener('keydown', event => {
+  const suggestions = [...$('search-results-list').querySelectorAll('[role="option"]')];
+  const currentIndex = suggestions.indexOf(document.activeElement);
+
+  if (event.key === 'ArrowDown' && currentIndex < suggestions.length - 1) {
+    event.preventDefault();
+    suggestions[currentIndex + 1].focus();
+  } else if (event.key === 'ArrowUp') {
+    event.preventDefault();
+    if (currentIndex <= 0) {
+      $('search').focus();
+    } else {
+      suggestions[currentIndex - 1].focus();
+    }
+  } else if (event.key === 'Escape') {
+    event.preventDefault();
+    $('search').focus();
+  }
+});
+
+function updateSearchView() {
+  const search = $('search').value.trim();
+  const isSearching = search.length > 0;
+  $('app').classList.toggle('search-active', isSearching);
+  $('search-results').classList.toggle('hidden', !isSearching);
+  $('search').setAttribute('aria-expanded', String(isSearching));
+
+  if (!isSearching) {
+    clearInterval(searchRefreshTimer);
+    $('search-results-status').textContent = '';
+    $('search-results-list').replaceChildren();
+    return;
+  }
+
+  $('search-results-status').textContent = 'Searching inventory...';
+  clearInterval(searchRefreshTimer);
+  searchRefreshTimer = setInterval(() => {
+    if (token && $('search').value.trim()) {
+      refresh();
+    }
+  }, 5000);
+}
+
+function updateFilterView() {
+  const hasActiveFilter = ['category', 'supplier', 'branch', 'status']
+    .some(id => $(id).value !== '');
+  $('app').classList.toggle('filter-active', hasActiveFilter);
+}
+
 $('search').oninput = () => {
+  updateSearchView();
   clearTimeout(searchTimer);
   searchTimer = setTimeout(refresh, 300);
 };
 $('search').onkeydown = event => {
+  if (event.key === 'ArrowDown') {
+    const firstSuggestion = $('search-results-list').querySelector(
+      '[role="option"]'
+    );
+    if (firstSuggestion) {
+      event.preventDefault();
+      firstSuggestion.focus();
+    }
+    return;
+  }
+
   if (event.key === 'Enter') {
     event.preventDefault();
     clearTimeout(searchTimer);
+    updateSearchView();
     refresh();
   }
 };
-$('category').onchange = refresh;
-$('supplier').onchange = refresh;
-$('status').onchange = refresh;
+$('category').onchange = () => {
+  updateFilterView();
+  refresh();
+};
+$('supplier').onchange = () => {
+  updateFilterView();
+  refresh();
+};
+$('branch').onchange = () => {
+  updateFilterView();
+  refresh();
+};
+$('status').onchange = () => {
+  updateFilterView();
+  refresh();
+};
 $('sort-by').onchange = refresh;
 $('sort-order').onchange = refresh;
 $('inventory').addEventListener('click', event => {
@@ -244,6 +337,9 @@ $('low-stock-alert-items').addEventListener('click', event => {
 $('view-low-stock').onclick = () => {
   $('search').value = '';
   $('status').value = 'low-stock';
+  document.querySelector('.filter-panel').open = true;
+  updateSearchView();
+  updateFilterView();
   refresh();
   $('inventory').scrollIntoView({ behavior: 'smooth', block: 'start' });
 };
@@ -254,8 +350,16 @@ $('component-details').addEventListener('click', event => {
   if (event.target.closest('[data-cancel-edit]') && currentComponent) {
     renderComponentDetails(currentComponent);
   }
+  if (event.target.closest('[data-refresh-movements]') && currentComponent) {
+    loadStockMovementHistory(currentComponent.id);
+  }
 });
 $('component-details').addEventListener('submit', async event => {
+  if (event.target.id === 'stock-movement-form') {
+    event.preventDefault();
+    await submitStockMovement(event.target);
+    return;
+  }
   if (event.target.id !== 'component-edit-form') return;
   event.preventDefault();
 
@@ -268,9 +372,9 @@ $('component-details').addEventListener('submit', async event => {
 
   const formData = new FormData(form);
   const updates = {
-    quantity: Number(formData.get('quantity')),
     unit_price: Number(formData.get('unit_price')),
     supplier: String(formData.get('supplier')).trim(),
+    branch: String(formData.get('branch')).trim(),
     reorder_level: Number(formData.get('reorder_level'))
   };
 
@@ -313,24 +417,44 @@ $('clear-filters').onclick = () => {
   $('search').value = '';
   $('category').value = '';
   $('supplier').value = '';
+  $('branch').value = '';
   $('status').value = '';
   $('sort-by').value = 'id';
   $('sort-order').value = 'asc';
+  updateSearchView();
+  updateFilterView();
   refresh();
 };
+
 $('supplier-btn').onclick = () => {
   $('supplier-feedback').classList.add('hidden');
   $('supplier-feedback').textContent = '';
   $('supplier-error').textContent = '';
-  $('supplier-card').classList.remove('hidden');
-  $('supplier-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('supplier-card').showModal();
   $('supplier-name').focus();
 };
+
 $('cancel-supplier').onclick = () => {
   $('supplier-form').reset();
-  $('supplier-card').classList.add('hidden');
   $('supplier-error').textContent = '';
+  $('supplier-card').close();
 };
+
+$('supplier-card').addEventListener('click', event => {
+  if (event.target === $('supplier-card')) {
+    $('supplier-card').close();
+  }
+});
+
+$('supplier-card').addEventListener('close', () => {
+  $('supplier-form').reset();
+  $('supplier-error').textContent = '';
+});
+
+$('supplier-name').addEventListener('input', event => {
+  event.target.setCustomValidity('');
+});
+
 $('supplier-form').onsubmit = async event => {
   event.preventDefault();
   const form = event.target;
@@ -349,6 +473,7 @@ $('supplier-form').onsubmit = async event => {
   nameInput.setCustomValidity('');
   submitButton.disabled = true;
   submitButton.textContent = 'Saving...';
+
   try {
     const supplier = await api('/api/suppliers', {
       method: 'POST',
@@ -356,8 +481,7 @@ $('supplier-form').onsubmit = async event => {
       body: JSON.stringify({ name })
     });
     form.reset();
-    $('supplier-feedback').textContent =
-      `${supplier.name} added successfully.`;
+    $('supplier-feedback').textContent = `${supplier.name} added successfully.`;
     $('supplier-feedback').classList.remove('hidden');
     await refresh();
   } catch (error) {
@@ -367,16 +491,78 @@ $('supplier-form').onsubmit = async event => {
     submitButton.textContent = 'Add supplier';
   }
 };
+
 $('supplier-name').addEventListener('input', event => {
   event.target.setCustomValidity('');
 });
 
+$('branch-btn').onclick = () => {
+  $('branch-feedback').classList.add('hidden');
+  $('branch-feedback').textContent = '';
+  $('branch-management-error').textContent = '';
+  $('branch-card').showModal();
+  $('branch-name').focus();
+};
+
+$('cancel-branch').onclick = () => {
+  $('branch-form').reset();
+  $('branch-card').close();
+  $('branch-management-error').textContent = '';
+};
+
+$('branch-card').addEventListener('click', event => {
+  if (event.target === $('branch-card')) {
+    $('branch-card').close();
+  }
+});
+
+$('branch-form').onsubmit = async event => {
+  event.preventDefault();
+  const form = event.target;
+  const nameInput = $('branch-name');
+  const name = nameInput.value.trim();
+  const submitButton = form.querySelector('[type="submit"]');
+  $('branch-management-error').textContent = '';
+  $('branch-feedback').classList.add('hidden');
+
+  if (!name) {
+    nameInput.setCustomValidity('Branch or area name is required.');
+    nameInput.reportValidity();
+    return;
+  }
+
+  nameInput.setCustomValidity('');
+  submitButton.disabled = true;
+  submitButton.textContent = 'Saving...';
+
+  try {
+    const branch = await api('/api/branches', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    form.reset();
+    $('branch-feedback').textContent = `${branch.name} added successfully.`;
+    $('branch-feedback').classList.remove('hidden');
+    await refresh();
+  } catch (error) {
+    $('branch-management-error').textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = 'Add branch';
+  }
+};
+
+$('branch-name').addEventListener('input', event => {
+  event.target.setCustomValidity('');
+});
 const componentFields = [
   'name',
   'category',
   'quantity',
   'unit_price',
   'supplier',
+  'branch',
   'reorder_level'
 ];
 
@@ -386,6 +572,7 @@ const fieldLabels = {
   quantity: 'Quantity',
   unit_price: 'Unit price',
   supplier: 'Supplier',
+  branch: 'Shop branch',
   reorder_level: 'Reorder level'
 };
 
@@ -468,30 +655,43 @@ function displayValidationErrors(details) {
   }
 }
 
-// ==================== ADD COMPONENT FORM ====================
-
+// ==================== ADD COMPONENT FORM =============
 $('add-btn').onclick = () => {
   $('add-feedback').classList.add('hidden');
   $('add-feedback').textContent = '';
-  $('form-card').classList.remove('hidden');
-  $('form-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('form-card').showModal();
   $('component-form').elements.namedItem('name').focus();
 };
 
 $('cancel-add').onclick = () => {
   $('component-form').reset();
   clearFieldErrors();
-  $('form-card').classList.add('hidden');
+  $('form-card').close();
 };
+$('form-card').addEventListener('click', event => {
+  if (event.target === $('form-card')) {
+    $('form-card').close();
+  }
+});
+$('form-card').addEventListener('close', () => {
+  $('component-form').reset();
+  clearFieldErrors();
+});
+$('branch-card').addEventListener('close', () => {
+  $('branch-form').reset();
+  $('branch-management-error').textContent = '';
+});
 
 const addTextFields = {
   name: 'Component name',
   category: 'Category',
-  supplier: 'Supplier'
+  supplier: 'Supplier',
+  branch: 'Shop branch'
 };
 for (const fieldName of Object.keys(addTextFields)) {
+  const eventName = ['supplier', 'branch'].includes(fieldName) ? 'change' : 'input';
   $('component-form').elements.namedItem(fieldName).addEventListener(
-    fieldName === 'supplier' ? 'change' : 'input',
+    eventName,
     event => event.target.setCustomValidity('')
   );
 }
@@ -601,7 +801,7 @@ $('component-form').onsubmit = async event => {
     form.reset();
     clearFieldErrors();
     
-    $('form-card').classList.add('hidden');
+    $('form-card').close();
     $('add-feedback').textContent =
       `${component.name} added successfully (SKU: ${component.sku}).`;
     $('add-feedback').classList.remove('hidden');
@@ -626,10 +826,10 @@ $('component-form').onsubmit = async event => {
   }
 };
 
-// ==================== LOAD AND FILTER INVENTORY ====================
-
+// ==================== LOAD AND FILTER INVENTORY =============
 let currentComponent = null;
 let availableSuppliers = [];
+let refreshRequestId = 0;
 
 function populateSelect(select, values, placeholder) {
   const selectedValue = select.value;
@@ -669,12 +869,32 @@ function renderSupplierList(suppliers) {
   });
 }
 
+function renderBranchList(branches) {
+  const list = $('branch-list');
+  list.replaceChildren();
+
+  if (!branches.length) {
+    const item = document.createElement('li');
+    item.className = 'empty-state';
+    item.textContent = 'No branches have been added yet.';
+    list.append(item);
+    return;
+  }
+
+  branches.forEach(branch => {
+    const item = document.createElement('li');
+    item.textContent = branch;
+    list.append(item);
+  });
+}
+
 async function refresh() {
   if (!token) return;
+  const requestId = ++refreshRequestId;
 
   $('inventory').innerHTML = `
     <tr>
-      <td colspan="9">Loading inventory...</td>
+      <td colspan="10">Loading inventory...</td>
     </tr>
   `;
 
@@ -702,6 +922,11 @@ async function refresh() {
       query.set('supplier', supplier);
     }
 
+    const branch = $('branch').value;
+    if (branch) {
+      query.set('branch', branch);
+    }
+
     // Filter by stock status
     const statusFilter = $('status').value;
 
@@ -719,22 +944,38 @@ async function refresh() {
     );
 
     // Send all selected filters in one request
-    const [items, dashboard, categories, suppliers] = await Promise.all([
+    const [items, dashboard, categories, suppliers, branches] = await Promise.all([
       api('/api/inventory?' + query.toString()),
       api('/api/dashboard'),
       api('/api/categories'),
-      api('/api/suppliers')
+      api('/api/suppliers'),
+      api('/api/branches')
     ]);
 
+    if (
+      requestId !== refreshRequestId ||
+      $('search').value.trim() !== search
+    ) {
+      return;
+    }
+
     availableSuppliers = suppliers;
+    availableBranches = branches;
     populateSelect($('category'), categories, 'All categories');
     populateSelect($('supplier'), suppliers, 'All suppliers');
+    populateSelect($('branch'), branches, 'All branches');
     populateSelect(
       $('component-form').elements.namedItem('supplier'),
       suppliers,
       'Choose a supplier'
     );
     renderSupplierList(suppliers);
+    populateSelect(
+      $('component-form').elements.namedItem('branch'),
+      branches,
+      'Choose a branch'
+    );
+    renderBranchList(branches);
 
     // Dashboard statistics
     $('stats').innerHTML = `
@@ -797,12 +1038,13 @@ async function refresh() {
 
     $('results-count').textContent =
       `${items.length} ${items.length === 1 ? 'item' : 'items'}`;
+    renderSearchResults(items);
 
     // Handle empty results
     if (!items.length) {
       $('inventory').innerHTML = `
         <tr>
-          <td colspan="9">
+          <td colspan="10">
             No matching components found.
             Try changing or clearing your filters.
           </td>
@@ -905,6 +1147,7 @@ async function refresh() {
           </td>
           <td>₹${Number(component.unit_price).toFixed(2)}</td>
           <td>${escapeHTML(component.supplier)}</td>
+          <td>${escapeHTML(component.branch)}</td>
           <td>${component.reorder_level}</td>
           <td><span class="status-badge status-${stockStatus}">${statusLabel}</span></td>
           <td>${action}</td>
@@ -913,7 +1156,12 @@ async function refresh() {
     }).join('');
 
   } catch (error) {
+    if (requestId !== refreshRequestId) return;
     console.error('Failed to load inventory:', error);
+    if ($('search').value.trim()) {
+      $('search-results-status').textContent =
+        'Unable to search inventory. Please try again.';
+    }
 
     if (
       error.message.includes('401') ||
@@ -935,7 +1183,7 @@ async function refresh() {
 
     $('inventory').innerHTML = `
       <tr>
-        <td colspan="9">
+        <td colspan="10">
           Unable to load inventory. Please try refreshing.
         </td>
       </tr>
@@ -943,10 +1191,47 @@ async function refresh() {
   }
 }
 
+function renderSearchResults(items) {
+  const search = $('search').value.trim();
+  if (!search) return;
+
+  const status = $('search-results-status');
+  const list = $('search-results-list');
+  status.textContent = items.length
+    ? `${items.length} ${items.length === 1 ? 'matching component' : 'matching components'}`
+    : 'No matching components found.';
+
+  list.innerHTML = items.map(component => `
+    <button
+      class="search-result"
+      type="button"
+      role="option"
+      aria-selected="false"
+      data-component-id="${component.id}"
+      aria-label="View ${escapeHTML(component.name)}, SKU ${escapeHTML(component.sku)}"
+    >
+      <span class="search-result-heading">
+        <strong>${escapeHTML(component.name)}</strong>
+        <span>${escapeHTML(component.sku)}</span>
+      </span>
+      <span class="search-result-details">
+        ${escapeHTML(component.category)} · ${escapeHTML(component.supplier)}
+      </span>
+      <span class="search-result-stock">
+        ${escapeHTML(component.branch)}
+      </span>
+      <span class="search-result-stock">
+        ${component.quantity} in stock · ₹${Number(component.unit_price).toFixed(2)}
+      </span>
+    </button>
+  `).join('');
+}
+
 async function showComponentDetails(componentId) {
   const dialog = $('component-dialog');
   const details = $('component-details');
   currentComponent = null;
+  stockMovementFeedback = '';
   details.innerHTML = '<p class="details-message">Loading component details...</p>';
   dialog.showModal();
 
@@ -960,6 +1245,136 @@ async function showComponentDetails(componentId) {
         Unable to load component details. ${escapeHTML(error.message)}
       </p>
     `;
+  }
+}
+
+let stockMovementFeedback = '';
+
+async function loadStockMovementHistory(componentId) {
+  const historyList = $('stock-movement-history-list');
+  if (!historyList) return;
+  historyList.innerHTML = '<p class="details-message">Loading movement history...</p>';
+
+  try {
+    const movements = await api(`/api/inventory/${componentId}/movements`);
+    if (
+      !currentComponent ||
+      currentComponent.id !== componentId ||
+      !document.querySelector('#stock-movement-history-list')
+    ) {
+      return;
+    }
+
+    const activeHistoryList = $('stock-movement-history-list');
+    activeHistoryList.innerHTML = movements.length
+      ? `
+        <ol class="stock-movement-list" aria-label="Recorded stock movements">
+          ${movements.map(movement => {
+            const isStockIn = movement.movement_type === 'STOCK_IN';
+            const recordedAt = new Intl.DateTimeFormat(undefined, {
+              dateStyle: 'medium',
+              timeStyle: 'short'
+            }).format(new Date(movement.timestamp));
+            return `
+              <li class="stock-movement-entry">
+                <div class="stock-movement-entry-heading">
+                  <span class="stock-movement-badge ${isStockIn ? 'stock-movement-in' : 'stock-movement-out'}">
+                    ${isStockIn ? 'Stock In' : 'Stock Out'}
+                  </span>
+                  <strong class="stock-movement-quantity ${isStockIn ? 'quantity-in' : 'quantity-out'}">
+                    ${isStockIn ? '+' : '−'}${movement.quantity} <span>units</span>
+                  </strong>
+                </div>
+                <dl class="stock-movement-meta">
+                  <div class="stock-movement-reason">
+                    <dt>Reason</dt>
+                    <dd>${escapeHTML(movement.reason)}</dd>
+                  </div>
+                  <div>
+                    <dt>Date &amp; time</dt>
+                    <dd><time datetime="${escapeHTML(movement.timestamp)}">${escapeHTML(recordedAt)}</time></dd>
+                  </div>
+                  <div>
+                    <dt>Recorded by</dt>
+                    <dd>${escapeHTML(movement.actor_role.charAt(0) + movement.actor_role.slice(1).toLowerCase())}</dd>
+                  </div>
+                </dl>
+              </li>
+            `;
+          }).join('')}
+        </ol>
+      `
+      : `
+        <div class="stock-movement-empty">
+          <strong>No movement history yet</strong>
+          <p>Stock additions and deductions for this component will appear here.</p>
+        </div>
+      `;
+  } catch (error) {
+    if (currentComponent && currentComponent.id === componentId) {
+      const activeHistoryList = $('stock-movement-history-list');
+      if (activeHistoryList) {
+        activeHistoryList.innerHTML = `
+          <p class="details-error" role="alert">
+            Unable to load stock movement history. ${escapeHTML(error.message)}
+          </p>
+        `;
+      }
+    }
+  }
+}
+
+async function submitStockMovement(form) {
+  if (!currentComponent) return;
+
+  const errorElement = $('stock-movement-error');
+  const feedback = $('stock-movement-feedback');
+  const submitButton = form.querySelector('[type="submit"]');
+  const formData = new FormData(form);
+  const movementType = String(formData.get('movement_type'));
+  const quantity = Number(formData.get('quantity'));
+  const reason = String(formData.get('reason')).trim();
+  errorElement.textContent = '';
+  feedback.textContent = '';
+
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    errorElement.textContent = 'Quantity must be a positive whole number.';
+    return;
+  }
+  if (!reason) {
+    errorElement.textContent = 'Enter a reason for this stock movement.';
+    return;
+  }
+  if (movementType === 'STOCK_OUT' && quantity > currentComponent.quantity) {
+    errorElement.textContent =
+      `Only ${currentComponent.quantity} unit${currentComponent.quantity === 1 ? '' : 's'} available.`;
+    return;
+  }
+
+  submitButton.disabled = true;
+  submitButton.textContent = 'Recording...';
+
+  try {
+    await api(`/api/inventory/${currentComponent.id}/movements`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        movement_type: movementType,
+        quantity,
+        reason
+      })
+    });
+
+    currentComponent.quantity +=
+      movementType === 'STOCK_IN' ? quantity : -quantity;
+    stockMovementFeedback =
+      `${movementType === 'STOCK_IN' ? 'Stock added' : 'Stock deducted'} successfully.`;
+    renderComponentDetails(currentComponent);
+    await refresh();
+  } catch (error) {
+    errorElement.textContent = error.message;
+    submitButton.disabled = false;
+    submitButton.textContent = 'Record movement';
   }
 }
 
@@ -988,6 +1403,41 @@ function renderComponentDetails(component) {
       : '';
   const editButton = ['ADMIN', 'MANAGER'].includes(role)
     ? '<button class="details-edit-button" type="button" data-edit-component>Edit details</button>'
+    : '';
+  const movementForm = ['ADMIN', 'MANAGER'].includes(role)
+    ? `
+      <form id="stock-movement-form" class="stock-movement-form">
+        <div class="stock-movement-form-heading">
+          <div class="stock-movement-section-icon" aria-hidden="true">↕</div>
+          <div>
+            <h3>Record stock movement</h3>
+            <p>Every adjustment is saved to this component's movement history.</p>
+          </div>
+        </div>
+        <div class="stock-movement-fields">
+          <label>
+            Movement
+            <select name="movement_type" required>
+              <option value="STOCK_IN">Stock In</option>
+              <option value="STOCK_OUT">Stock Out</option>
+            </select>
+          </label>
+          <label>
+            Quantity
+            <input name="quantity" type="number" min="1" step="1" required placeholder="Units">
+          </label>
+          <label class="stock-movement-reason">
+            Reason
+            <input name="reason" type="text" maxlength="500" required placeholder="e.g. Supplier delivery or customer sale">
+          </label>
+        </div>
+        <p id="stock-movement-feedback" class="form-feedback" role="status" aria-live="polite">${escapeHTML(stockMovementFeedback)}</p>
+        <p id="stock-movement-error" class="details-error" role="alert"></p>
+        <div class="stock-movement-form-actions">
+          <button type="submit">Record movement</button>
+        </div>
+      </form>
+    `
     : '';
   const imageSection = component.image_url
     ? `
@@ -1055,13 +1505,33 @@ function renderComponentDetails(component) {
         <dd>${escapeHTML(component.supplier)}</dd>
       </div>
       <div class="detail-item">
+        <dt>Shop branch</dt>
+        <dd>${escapeHTML(component.branch)}</dd>
+      </div>
+      <div class="detail-item">
         <dt>Reorder level</dt>
         <dd>${component.reorder_level}</dd>
       </div>
       ${dateAdded}
     </dl>
     ${editButton}
+    ${movementForm}
+    <section class="stock-movement-history" aria-labelledby="stock-movement-history-title">
+      <div class="stock-movement-history-heading">
+        <div>
+          <h3 id="stock-movement-history-title">Stock movement history</h3>
+          <p>Every recorded change, newest first.</p>
+        </div>
+        <button class="secondary-button" type="button" data-refresh-movements aria-label="Refresh stock movement history">
+          <span aria-hidden="true">↻</span> Refresh
+        </button>
+      </div>
+      <div id="stock-movement-history-list" class="stock-movement-history-list" aria-live="polite">
+        <p class="details-message">Loading movement history...</p>
+      </div>
+    </section>
   `;
+  loadStockMovementHistory(component.id);
   const imageForm = $('component-image-form');
 
   const removeImageButton = $('remove-component-image');
@@ -1157,12 +1627,13 @@ function renderComponentEditForm(component, errorMessage = '') {
       ${escapeHTML(supplier)}
     </option>
   `).join('');
+  const branchOptions = availableBranches.map(branch => `
+    <option value="${escapeHTML(branch)}"${branch === component.branch ? ' selected' : ''}>
+      ${escapeHTML(branch)}
+    </option>
+  `).join('');
   $('component-details').innerHTML = `
     <form id="component-edit-form" class="component-edit-form">
-      <label>
-        Quantity
-        <input name="quantity" type="number" min="0" step="1" value="${component.quantity}" required>
-      </label>
       <label>
         Unit price (₹)
         <input name="unit_price" type="number" min="0" step="0.01" value="${component.unit_price}" required>
@@ -1172,6 +1643,13 @@ function renderComponentEditForm(component, errorMessage = '') {
         <select name="supplier" required>
           <option value="">Choose a supplier</option>
           ${supplierOptions}
+        </select>
+      </label>
+      <label>
+        Shop branch
+        <select name="branch" required>
+          <option value="">Choose a branch</option>
+          ${branchOptions}
         </select>
       </label>
       <label>
@@ -1187,8 +1665,428 @@ function renderComponentEditForm(component, errorMessage = '') {
   `;
 }
 
-// ==================== HTML ESCAPING ====================
+// ==================== PURCHASE ORDERS =============
+let purchaseOrderSuppliers = [];
+let purchaseOrderComponents = [];
+let purchaseOrders = [];
 
+function openPurchaseOrders() {
+  $('search').value = '';
+  updateSearchView();
+  $('purchase-orders-section').classList.remove('hidden');
+  $('purchase-orders-section').scrollIntoView({
+    behavior: 'smooth',
+    block: 'start'
+  });
+  loadPurchaseOrders();
+}
+
+function closePurchaseOrders() {
+  $('purchase-orders-section').classList.add('hidden');
+  $('inventory-section').scrollIntoView({
+    behavior: 'smooth',
+    block: 'start'
+  });
+}
+
+async function loadPurchaseOrders() {
+  const refreshButton = $('refresh-purchase-orders');
+  refreshButton.disabled = true;
+  $('purchase-orders-feedback').textContent = 'Loading purchase orders...';
+
+  try {
+    const [orders, suppliers, components] = await Promise.all([
+      api('/api/purchase-orders'),
+      api('/api/suppliers/catalog'),
+      api('/api/inventory?limit=500')
+    ]);
+
+    purchaseOrders = orders;
+    purchaseOrderSuppliers = suppliers;
+    purchaseOrderComponents = components;
+    renderPurchaseOrders();
+    $('purchase-orders-feedback').textContent = suppliers.length
+      ? ''
+      : 'Add a supplier using Manage suppliers before creating a purchase order.';
+    $('create-purchase-order-btn').disabled =
+      !['ADMIN', 'MANAGER'].includes(role) ||
+      suppliers.length === 0 ||
+      components.length === 0;
+  } catch (error) {
+    $('purchase-orders-feedback').textContent =
+      `Unable to load purchase orders: ${error.message}`;
+    $('purchase-orders-list').innerHTML =
+      '<p class="empty-state">Purchase orders could not be loaded.</p>';
+  } finally {
+    refreshButton.disabled = false;
+  }
+}
+
+function renderPurchaseOrders() {
+  const list = $('purchase-orders-list');
+  const suppliersById = new Map(
+    purchaseOrderSuppliers.map(supplier => [supplier.id, supplier.name])
+  );
+  const componentsById = new Map(
+    purchaseOrderComponents.map(component => [component.id, component])
+  );
+
+  if (!purchaseOrders.length) {
+    list.innerHTML = '<p class="empty-state">No purchase orders yet.</p>';
+    return;
+  }
+
+  list.innerHTML = purchaseOrders.map(order => {
+    const supplierName =
+      suppliersById.get(order.supplier_id) || `Supplier #${order.supplier_id}`;
+    const orderDate = new Intl.DateTimeFormat(undefined, {
+      dateStyle: 'medium'
+    }).format(new Date(order.order_date));
+    const orderItems = order.items.map(item => {
+      const component = componentsById.get(item.component_id);
+      const componentName = component
+        ? `${component.name} (${component.sku})`
+        : `Component #${item.component_id}`;
+      const remaining = item.ordered_quantity - item.received_quantity;
+
+      return `
+        <li class="purchase-order-item">
+          <span>${escapeHTML(componentName)}</span>
+          <span>${item.received_quantity} / ${item.ordered_quantity} received</span>
+          ${remaining > 0
+            ? `<span class="purchase-order-outstanding">${remaining} outstanding</span>`
+            : '<span class="purchase-order-complete">Complete</span>'}
+        </li>
+      `;
+    }).join('');
+    const canManage = ['ADMIN', 'MANAGER'].includes(role);
+    const statusActions = canManage && order.status === 'DRAFT'
+      ? `
+        <button class="purchase-order-action" type="button" data-action="status" data-status="ORDERED" data-order-id="${order.id}">Mark ordered</button>
+        <button class="secondary-button purchase-order-action" type="button" data-action="status" data-status="CANCELLED" data-order-id="${order.id}">Cancel order</button>
+      `
+      : '';
+    const canReceive = canManage &&
+      ['ORDERED', 'PARTIALLY_RECEIVED'].includes(order.status);
+    const receiveForm = canReceive
+      ? `
+        <form class="purchase-order-receive-form" data-receive-order="${order.id}">
+          <h4>Receive delivery</h4>
+          <p>Enter the quantities delivered now. Leave other items at zero.</p>
+          ${order.items.map(item => {
+            const component = componentsById.get(item.component_id);
+            const componentName = component
+              ? `${component.name} (${component.sku})`
+              : `Component #${item.component_id}`;
+            const remaining = item.ordered_quantity - item.received_quantity;
+            return remaining > 0
+              ? `
+                <label class="purchase-order-receive-item">
+                  <span>${escapeHTML(componentName)} <small>(${remaining} remaining)</small></span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="${remaining}"
+                    step="1"
+                    value="0"
+                    data-order-item-id="${item.id}"
+                    aria-label="Quantity received for ${escapeHTML(componentName)}"
+                  >
+                </label>
+              `
+              : '';
+          }).join('')}
+          <p class="purchase-order-inline-error" role="alert"></p>
+          <button type="submit">Record received stock</button>
+        </form>
+      `
+      : '';
+
+    return `
+      <article class="purchase-order-card">
+        <div class="purchase-order-card-heading">
+          <div>
+            <p class="eyebrow">${escapeHTML(order.order_number)}</p>
+            <h3>${escapeHTML(supplierName)}</h3>
+            <p class="purchase-order-date">Created ${escapeHTML(orderDate)}</p>
+          </div>
+          <span class="purchase-order-status status-${order.status.toLowerCase().replaceAll('_', '-')}">
+            ${escapeHTML(order.status.replaceAll('_', ' '))}
+          </span>
+        </div>
+        <ul class="purchase-order-item-list">${orderItems}</ul>
+        <div class="purchase-order-card-actions">
+          <button class="secondary-button purchase-order-action" type="button" data-action="history" data-order-id="${order.id}">
+            Receipt history
+          </button>
+          ${statusActions}
+        </div>
+        <div class="purchase-order-receipt-history" data-receipt-panel="${order.id}" hidden></div>
+        ${receiveForm}
+      </article>
+    `;
+  }).join('');
+}
+
+function appendPurchaseOrderItem() {
+  const row = document.createElement('div');
+  row.className = 'purchase-order-item-row';
+
+  const label = document.createElement('label');
+  label.textContent = 'Component';
+  const componentSelect = document.createElement('select');
+  componentSelect.name = 'component_id';
+  componentSelect.required = true;
+  componentSelect.innerHTML = [
+    '<option value="">Choose a component</option>',
+    ...purchaseOrderComponents.map(component =>
+      `<option value="${component.id}">${escapeHTML(component.name)} · ${escapeHTML(component.sku)} · ${component.quantity} in stock</option>`
+    )
+  ].join('');
+  label.append(componentSelect);
+
+  const quantityLabel = document.createElement('label');
+  quantityLabel.textContent = 'Quantity';
+  const quantityInput = document.createElement('input');
+  quantityInput.name = 'ordered_quantity';
+  quantityInput.type = 'number';
+  quantityInput.min = '1';
+  quantityInput.step = '1';
+  quantityInput.required = true;
+  quantityInput.placeholder = 'Units';
+  quantityLabel.append(quantityInput);
+
+  const removeButton = document.createElement('button');
+  removeButton.className = 'secondary-button remove-purchase-order-item';
+  removeButton.type = 'button';
+  removeButton.textContent = 'Remove';
+  removeButton.setAttribute('aria-label', 'Remove component from order');
+
+  row.append(label, quantityLabel, removeButton);
+  $('purchase-order-items').append(row);
+  updatePurchaseOrderItemRows();
+}
+
+function updatePurchaseOrderItemRows() {
+  const rows = [...$('purchase-order-items').children];
+  rows.forEach(row => {
+    row.querySelector('.remove-purchase-order-item').disabled = rows.length === 1;
+  });
+}
+
+function openPurchaseOrderDialog() {
+  const supplierSelect = $('purchase-order-supplier');
+  supplierSelect.innerHTML = [
+    '<option value="">Choose a supplier</option>',
+    ...purchaseOrderSuppliers.map(supplier =>
+      `<option value="${supplier.id}">${escapeHTML(supplier.name)}</option>`
+    )
+  ].join('');
+  $('purchase-order-supplier-help').textContent =
+    purchaseOrderSuppliers.length
+      ? ''
+      : 'Add a supplier using Manage suppliers before creating an order.';
+  $('purchase-order-items').replaceChildren();
+  $('purchase-order-form-error').textContent = '';
+  appendPurchaseOrderItem();
+  $('purchase-order-dialog').showModal();
+  supplierSelect.focus();
+}
+
+$('purchase-orders-btn').onclick = openPurchaseOrders;
+$('refresh-purchase-orders').onclick = loadPurchaseOrders;
+$('close-purchase-orders').onclick = closePurchaseOrders;
+$('create-purchase-order-btn').onclick = openPurchaseOrderDialog;
+$('close-purchase-order-dialog').onclick = () => $('purchase-order-dialog').close();
+$('cancel-purchase-order').onclick = () => $('purchase-order-dialog').close();
+$('add-purchase-order-item').onclick = appendPurchaseOrderItem;
+
+$('purchase-order-items').addEventListener('click', event => {
+  const removeButton = event.target.closest('.remove-purchase-order-item');
+  if (removeButton && $('purchase-order-items').children.length > 1) {
+    removeButton.closest('.purchase-order-item-row').remove();
+    updatePurchaseOrderItemRows();
+  }
+});
+
+$('purchase-order-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const form = event.target;
+  const submitButton = $('submit-purchase-order');
+  const formError = $('purchase-order-form-error');
+  formError.textContent = '';
+
+  const rows = [...$('purchase-order-items').querySelectorAll('.purchase-order-item-row')];
+  const items = rows.map(row => ({
+    component_id: Number(row.querySelector('[name="component_id"]').value),
+    ordered_quantity: Number(row.querySelector('[name="ordered_quantity"]').value)
+  }));
+  const componentIds = items.map(item => item.component_id);
+
+  if (componentIds.some(id => !id) || items.some(item =>
+    !Number.isInteger(item.ordered_quantity) || item.ordered_quantity < 1
+  )) {
+    formError.textContent = 'Choose a component and enter a positive whole-number quantity for every row.';
+    return;
+  }
+
+  if (new Set(componentIds).size !== componentIds.length) {
+    formError.textContent = 'Each component can only be added once to an order.';
+    return;
+  }
+
+  submitButton.disabled = true;
+  submitButton.textContent = 'Creating...';
+
+  try {
+    const order = await api('/api/purchase-orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        supplier_id: Number($('purchase-order-supplier').value),
+        items
+      })
+    });
+    form.reset();
+    $('purchase-order-dialog').close();
+    await loadPurchaseOrders();
+    $('purchase-orders-feedback').textContent =
+      `${order.order_number} was created as a draft.`;
+  } catch (error) {
+    formError.textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = 'Create order';
+  }
+});
+
+$('purchase-orders-list').addEventListener('click', async event => {
+  const actionButton = event.target.closest('[data-action]');
+  if (!actionButton) return;
+
+  const orderId = actionButton.dataset.orderId;
+  if (actionButton.dataset.action === 'history') {
+    const panel = $('purchase-orders-list').querySelector(
+      `[data-receipt-panel="${orderId}"]`
+    );
+    if (!panel.hidden) {
+      panel.hidden = true;
+      return;
+    }
+
+    actionButton.disabled = true;
+    panel.hidden = false;
+    panel.textContent = 'Loading receipt history...';
+    try {
+      const receipts = await api(`/api/purchase-orders/${orderId}/receipts`);
+      const order = purchaseOrders.find(item => String(item.id) === orderId);
+      const orderItems = new Map(
+        (order ? order.items : []).map(item => [item.id, item.component_id])
+      );
+      const components = new Map(
+        purchaseOrderComponents.map(component => [component.id, component.name])
+      );
+      panel.innerHTML = receipts.length
+        ? `<h4>Receipt history</h4><ul>${receipts.map(receipt => {
+          const componentId = orderItems.get(receipt.purchase_order_item_id);
+          const componentName = components.get(componentId) || `Component #${componentId}`;
+          const receivedAt = new Intl.DateTimeFormat(undefined, {
+            dateStyle: 'medium',
+            timeStyle: 'short'
+          }).format(new Date(receipt.received_at));
+          return `<li>${escapeHTML(componentName)}: ${receipt.received_quantity} received on ${escapeHTML(receivedAt)}</li>`;
+        }).join('')}</ul>`
+        : '<p>No stock has been received yet.</p>';
+    } catch (error) {
+      panel.textContent = `Unable to load receipt history: ${error.message}`;
+    } finally {
+      actionButton.disabled = false;
+    }
+    return;
+  }
+
+  if (actionButton.dataset.action === 'status') {
+    const status = actionButton.dataset.status;
+    if (
+      status === 'CANCELLED' &&
+      !window.confirm('Cancel this purchase order? This cannot be undone.')
+    ) {
+      return;
+    }
+
+    actionButton.disabled = true;
+    try {
+      await api(`/api/purchase-orders/${orderId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      await loadPurchaseOrders();
+      $('purchase-orders-feedback').textContent =
+        `Purchase order status updated to ${status.toLowerCase()}.`;
+    } catch (error) {
+      $('purchase-orders-feedback').textContent =
+        `Unable to update purchase order: ${error.message}`;
+      actionButton.disabled = false;
+    }
+  }
+});
+
+$('purchase-orders-list').addEventListener('submit', async event => {
+  const form = event.target.closest('[data-receive-order]');
+  if (!form) return;
+  event.preventDefault();
+
+  const errorElement = form.querySelector('.purchase-order-inline-error');
+  const submitButton = form.querySelector('[type="submit"]');
+  errorElement.textContent = '';
+  const items = [...form.querySelectorAll('[data-order-item-id]')]
+    .map(input => ({
+      purchase_order_item_id: Number(input.dataset.orderItemId),
+      received_quantity: Number(input.value)
+    }))
+    .filter(item => item.received_quantity > 0);
+
+  if (!items.length) {
+    errorElement.textContent = 'Enter at least one quantity to receive.';
+    return;
+  }
+  if (items.some(item => !Number.isInteger(item.received_quantity))) {
+    errorElement.textContent = 'Received quantities must be whole numbers.';
+    return;
+  }
+
+  if (!form.dataset.idempotencyKey) {
+    form.dataset.idempotencyKey =
+      globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function'
+        ? globalThis.crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  submitButton.disabled = true;
+  submitButton.textContent = 'Recording...';
+  try {
+    await api(`/api/purchase-orders/${form.dataset.receiveOrder}/receive`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        idempotency_key: form.dataset.idempotencyKey,
+        items
+      })
+    });
+    await Promise.all([loadPurchaseOrders(), refresh()]);
+    $('purchase-orders-feedback').textContent =
+      'Delivery recorded and inventory updated.';
+  } catch (error) {
+    errorElement.textContent = error.message;
+    await loadPurchaseOrders();
+  } finally {
+    submitButton.disabled = false;
+    submitButton.textContent = 'Record received stock';
+  }
+});
+
+// ==================== HTML ESCAPING =============
 function escapeHTML(value) {
   return String(value ?? '').replace(/[&<>"']/g, character => ({
     '&': '&amp;',
@@ -1200,7 +2098,6 @@ function escapeHTML(value) {
 }
 
 // ==================== DELETE COMPONENT ====================
-
 let pendingDeleteComponentId = null;
 
 const deleteConfirmationDialog = $('delete-confirmation-dialog');
@@ -1303,6 +2200,5 @@ confirmDeleteButton.textContent = 'Confirm Delete';
 
 
 
-// ==================== INITIALIZE APPLICATION ====================
-
+// ==================== INITIALIZE APPLICATION =============
 setLoggedIn();

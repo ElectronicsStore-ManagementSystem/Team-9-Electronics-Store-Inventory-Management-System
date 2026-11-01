@@ -1,14 +1,18 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator
+
 
 class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=80)
     password: str = Field(min_length=1, max_length=128)
 
+
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     role: str
+
 
 class SupplierCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
@@ -21,10 +25,32 @@ class SupplierCreate(BaseModel):
             raise ValueError("Supplier name cannot be blank.")
         return value
 
+
 class SupplierResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
+
+
+class BranchCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def trim_name(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Branch name cannot be blank.")
+        return value
+
+
+class BranchResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+
 
 class ComponentCreate(BaseModel):
     name: str = Field(
@@ -50,6 +76,12 @@ class ComponentCreate(BaseModel):
         max_length=120,
         description="Required supplier name",
     )
+    branch: str = Field(
+        default="Main Branch",
+        min_length=1,
+        max_length=120,
+        description="Shop branch holding this component",
+    )
     reorder_level: int = Field(default=5, ge=0)
     image_url: str | None = Field(default=None, max_length=500)
 
@@ -62,8 +94,7 @@ class ComponentCreate(BaseModel):
             )
         return None
 
-
-    @field_validator("name", "category", "supplier")
+    @field_validator("name", "category", "supplier", "branch")
     @classmethod
     def trim_text(cls, value: str) -> str:
         value = value.strip()
@@ -73,11 +104,13 @@ class ComponentCreate(BaseModel):
 
         return value
 
-    
+
 class ComponentUpdate(BaseModel):
-    quantity: int | None = Field(default=None, ge=0)
+    model_config = ConfigDict(extra="forbid")
+
     unit_price: float | None = Field(default=None, ge=0, allow_inf_nan=False)
     supplier: str | None = Field(default=None, min_length=1, max_length=120)
+    branch: str | None = Field(default=None, min_length=1, max_length=120)
     reorder_level: int | None = Field(default=None, ge=0)
 
     @field_validator("supplier")
@@ -85,13 +118,31 @@ class ComponentUpdate(BaseModel):
     def trim_supplier(cls, value: str | None) -> str | None:
         if value is None:
             return None
+
         value = value.strip()
+
         if not value:
             raise ValueError("Supplier cannot be blank")
+
         return value
+
+    @field_validator("branch")
+    @classmethod
+    def trim_branch(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+
+        value = value.strip()
+
+        if not value:
+            raise ValueError("Branch cannot be blank")
+
+        return value
+
 
 class ComponentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
     id: int
     sku: str
     name: str
@@ -99,23 +150,28 @@ class ComponentResponse(BaseModel):
     quantity: int
     unit_price: float
     supplier: str
+    branch: str
     reorder_level: int
     image_url: str | None
     active: bool
     created_at: datetime | None = None
 
+
 class AvailabilityResponse(ComponentResponse):
     status: str
+
 
 class CategoryStockSummary(BaseModel):
     category: str
     quantity: int
     component_count: int
 
+
 class StockTrendPoint(BaseModel):
     date: str
     quantity: int
     component_count: int
+
 
 class DashboardResponse(BaseModel):
     total_components: int
@@ -125,3 +181,101 @@ class DashboardResponse(BaseModel):
     recently_added: list[ComponentResponse]
     category_stock: list[CategoryStockSummary]
     stock_trend: list[StockTrendPoint]
+
+
+class StockMovementCreate(BaseModel):
+    movement_type: str = Field(
+        pattern="^(STOCK_IN|STOCK_OUT)$",
+    )
+    quantity: int = Field(
+        gt=0,
+        description="Movement quantity must be greater than zero",
+    )
+    reason: str = Field(
+        min_length=1,
+        max_length=500,
+    )
+
+    @field_validator("reason")
+    @classmethod
+    def validate_reason(cls, value: str) -> str:
+        value = value.strip()
+
+        if not value:
+            raise ValueError("Reason cannot be blank")
+
+        return value
+
+
+class StockMovementResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    component_id: int
+    component_name: str
+    movement_type: str
+    quantity: int
+    reason: str
+    timestamp: datetime
+    user_id: int
+    actor_role: str = Field(validation_alias=AliasPath("actor", "role"))
+
+
+# ---------------- PURCHASE ORDER SCHEMAS ----------------
+
+class PurchaseOrderItemCreate(BaseModel):
+    component_id: int = Field(gt=0)
+    ordered_quantity: int = Field(gt=0)
+
+
+class PurchaseOrderCreate(BaseModel):
+    supplier_id: int = Field(gt=0)
+    items: list[PurchaseOrderItemCreate] = Field(min_length=1)
+
+
+class PurchaseOrderItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    component_id: int
+    ordered_quantity: int
+    received_quantity: int
+
+
+class PurchaseOrderResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    order_number: str
+    supplier_id: int
+    status: str
+    order_date: datetime
+    created_by: int
+    items: list[PurchaseOrderItemResponse]
+
+
+class PurchaseOrderStatusUpdate(BaseModel):
+    status: str = Field(
+        pattern="^(DRAFT|ORDERED|CANCELLED)$"
+    )
+
+
+class PurchaseOrderReceiveItem(BaseModel):
+    purchase_order_item_id: int = Field(gt=0)
+    received_quantity: int = Field(gt=0)
+
+
+class PurchaseOrderReceive(BaseModel):
+    idempotency_key: str = Field(min_length=1, max_length=100)
+    items: list[PurchaseOrderReceiveItem] = Field(min_length=1)
+
+
+class PurchaseOrderReceiptResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    purchase_order_item_id: int
+    received_quantity: int
+    received_at: datetime
+    received_by: int
+    idempotency_key: str

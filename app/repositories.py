@@ -1,10 +1,20 @@
 from collections.abc import Sequence
+import uuid
 
 from sqlalchemy import and_, case, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from .models import AuditLog, Component, Supplier, User
-
+from .models import (
+    AuditLog,
+    Branch,
+    Component,
+    PurchaseOrder,
+    PurchaseOrderItem,
+    PurchaseOrderReceipt,
+    StockMovement,
+    Supplier,
+    User,
+)
 
 def find_user_by_username(db: Session, username: str) -> User | None:
     return db.scalar(select(User).where(User.username == username))
@@ -27,6 +37,7 @@ def list_components(
     search: str | None = None,
     category: str | None = None,
     supplier: str | None = None,
+    branch: str | None = None,
     status: str | None = None,
     sort: str = "id",
     allow_date_sort: bool = False,
@@ -55,17 +66,27 @@ def list_components(
     query = select(Component).where(Component.active.is_(True))
     if search:
         term = f"%{search}%"
-        query = query.where(
-            or_(
-                Component.name.ilike(term),
-                Component.sku.ilike(term),
-                Component.category.ilike(term),
+        search_conditions = [
+            Component.name.ilike(term),
+            Component.sku.ilike(term),
+            Component.category.ilike(term),
+        ]
+        category_aliases = {
+            "microprocessor": "microcontroller",
+            "microprocessors": "microcontroller",
+        }
+        category_alias = category_aliases.get(search.casefold())
+        if category_alias:
+            search_conditions.append(
+                Component.category.ilike(f"%{category_alias}%")
             )
-        )
+        query = query.where(or_(*search_conditions))
     if category:
         query = query.where(Component.category == category)
     if supplier:
         query = query.where(Component.supplier == supplier)
+    if branch:
+        query = query.where(Component.branch == branch)
     if status == "out-of-stock":
         query = query.where(Component.quantity == 0)
     elif status == "low-stock":
@@ -120,6 +141,12 @@ def list_suppliers(db: Session) -> list[str]:
     return sorted(names_by_normalized.values(), key=str.casefold)
 
 
+def list_supplier_records(db: Session) -> list[Supplier]:
+    return list(
+        db.scalars(
+            select(Supplier).order_by(func.lower(Supplier.name), Supplier.id)
+        )
+    )
 def create_supplier(db: Session, name: str) -> Supplier:
     normalized_name = name.casefold()
     if any(
@@ -134,6 +161,37 @@ def create_supplier(db: Session, name: str) -> Supplier:
     db.refresh(supplier)
     return supplier
 
+def list_branches(db: Session) -> list[str]:
+    return list(
+        db.scalars(
+            select(Branch.name).order_by(func.lower(Branch.name))
+        )
+    )
+
+
+def create_branch(db: Session, name: str) -> Branch:
+    normalized_name = name.casefold()
+
+    existing = db.scalar(
+        select(Branch).where(Branch.normalized_name == normalized_name)
+    )
+
+    if existing is not None:
+        raise ValueError("A branch with this name already exists.")
+
+    branch = Branch(name=name, normalized_name=normalized_name)
+
+    db.add(branch)
+    db.commit()
+    db.refresh(branch)
+
+    return branch
+
+
+def find_branch_by_name(db: Session, name: str) -> Branch | None:
+    return db.scalar(
+        select(Branch).where(Branch.normalized_name == name.casefold())
+    )
 
 def get_active_component(db: Session, component_id: int) -> Component | None:
     component = db.get(Component, component_id)
@@ -279,3 +337,143 @@ def get_dashboard_summary(db: Session) -> dict:
             for date, quantity, count in trend_rows
         ],
     }
+
+def create_stock_movement(
+    db: Session,
+    component: Component,
+    user: User,
+    movement_type: str,
+    quantity: int,
+    reason: str,
+) -> StockMovement:
+    movement = StockMovement(
+        component_id=component.id,
+        component_name=component.name,
+        movement_type=movement_type,
+        quantity=quantity,
+        reason=reason,
+        user_id=user.id,
+        actor=user,
+    )
+
+    db.add(movement)
+    return movement
+
+
+def list_stock_movements(
+    db: Session,
+    component_id: int,
+) -> list[StockMovement]:
+    return list(
+        db.scalars(
+            select(StockMovement)
+            .options(joinedload(StockMovement.actor))
+            .where(StockMovement.component_id == component_id)
+            .order_by(StockMovement.timestamp.desc(), StockMovement.id.desc())
+        )
+    )
+
+
+# ---------------- PURCHASE ORDER REPOSITORIES ----------------
+
+def create_purchase_order(
+    db: Session,
+    supplier: Supplier,
+    user: User,
+    items: list[dict],
+) -> PurchaseOrder:
+
+    order_number = f"PO-{uuid.uuid4().hex[:12].upper()}"
+
+    purchase_order = PurchaseOrder(
+        order_number=order_number,
+        supplier_id=supplier.id,
+        status="DRAFT",
+        created_by=user.id,
+    )
+
+    db.add(purchase_order)
+    db.flush()
+
+    for item in items:
+        db.add(
+            PurchaseOrderItem(
+                purchase_order_id=purchase_order.id,
+                component_id=item["component_id"],
+                ordered_quantity=item["ordered_quantity"],
+                received_quantity=0,
+            )
+        )
+
+    db.flush()
+    return purchase_order
+
+
+def get_purchase_order(
+    db: Session,
+    purchase_order_id: int,
+) -> PurchaseOrder | None:
+
+    return db.get(PurchaseOrder, purchase_order_id)
+
+
+def list_purchase_orders(
+    db: Session,
+) -> list[PurchaseOrder]:
+
+    return list(
+        db.query(PurchaseOrder)
+        .order_by(PurchaseOrder.order_date.desc())
+        .all()
+    )
+
+
+def update_purchase_order_status(
+    db: Session,
+    purchase_order: PurchaseOrder,
+    status: str,
+) -> PurchaseOrder:
+
+    purchase_order.status = status
+    db.flush()
+    return purchase_order
+
+
+def create_purchase_order_receipt(
+    db: Session,
+    purchase_order_item: PurchaseOrderItem,
+    quantity: int,
+    user: User,
+    idempotency_key: str,
+) -> PurchaseOrderReceipt:
+
+    receipt = PurchaseOrderReceipt(
+        purchase_order_item_id=purchase_order_item.id,
+        received_quantity=quantity,
+        received_by=user.id,
+        idempotency_key=idempotency_key,
+    )
+
+    db.add(receipt)
+    db.flush()
+    return receipt
+
+
+def list_purchase_order_receipts(
+    db: Session,
+    purchase_order_id: int,
+) -> list[PurchaseOrderReceipt]:
+
+    return list(
+        db.query(PurchaseOrderReceipt)
+        .join(
+            PurchaseOrderItem,
+            PurchaseOrderReceipt.purchase_order_item_id
+            == PurchaseOrderItem.id,
+        )
+        .filter(
+            PurchaseOrderItem.purchase_order_id == purchase_order_id
+        )
+        .order_by(PurchaseOrderReceipt.received_at.desc())
+        .all()
+    )

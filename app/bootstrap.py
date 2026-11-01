@@ -1,11 +1,14 @@
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, select, text
+from sqlalchemy.orm import Session
 
 from .db import Base, SessionLocal, engine
 from .models import (
     AvailabilityCheck,
+    Branch,
     Component,
     DowntimeIncident,
     MaintenanceWindow,
+    Supplier,
     User,
 )
 from .repositories import find_user_by_username, insert_seed_records
@@ -13,7 +16,14 @@ from .security import hash_password
 def seed_demo_data() -> None:
     db = SessionLocal()
     try:
+        if not db.query(Branch).filter_by(
+            normalized_name="main branch"
+        ).first():
+            db.add(Branch(name="Main Branch", normalized_name="main branch"))
+            db.commit()
+
         if find_user_by_username(db, "admin"):
+            _sync_component_suppliers(db)
             return
         users = [
             User(
@@ -57,12 +67,49 @@ def seed_demo_data() -> None:
             ),
         ]
         insert_seed_records(db, users, components)
+        _sync_component_suppliers(db)
     finally:
         db.close()
 
 
+def _sync_component_suppliers(db: Session) -> None:
+    existing_names = {
+        name.casefold()
+        for name in db.scalars(select(Supplier.normalized_name))
+    }
+
+    for name in db.scalars(select(Component.supplier).distinct()):
+        normalized_name = name.strip().casefold()
+        display_name = name.strip()
+        if display_name and normalized_name not in existing_names:
+            db.add(
+                Supplier(
+                    name=display_name,
+                    normalized_name=normalized_name,
+                )
+            )
+            existing_names.add(normalized_name)
+
+    db.commit()
+
+
 def initialize_database() -> None:
     Base.metadata.create_all(bind=engine)
+
+    component_columns = {
+        column["name"]
+        for column in inspect(engine).get_columns("components")
+    }
+
+    if "branch" not in component_columns:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "ALTER TABLE components "
+                    "ADD COLUMN branch VARCHAR(120) NOT NULL "
+                    "DEFAULT 'Main Branch'"
+                )
+            )
 
     columns = {
         column["name"]
@@ -74,5 +121,16 @@ def initialize_database() -> None:
             connection.execute(
                 text("ALTER TABLE users ADD COLUMN last_activity DATETIME")
             )
+
+    db = SessionLocal()
+    try:
+        default_branch = db.query(Branch).filter_by(
+            normalized_name="main branch"
+        ).first()
+        if default_branch is None:
+            db.add(Branch(name="Main Branch", normalized_name="main branch"))
+            db.commit()
+    finally:
+        db.close()
 
     seed_demo_data()
