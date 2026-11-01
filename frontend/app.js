@@ -93,9 +93,13 @@ async function api(path, options = {}) {
     } catch {
       // Response was not JSON.
     }
-     const message = Array.isArray(data.detail)
-      ? data.detail.map(issue => issue.msg).join(', ')
-      : data.detail;
+    const errorPayload = data.error || {};
+    const details = errorPayload.details || data.detail;
+    const message = errorPayload.message || (
+      Array.isArray(details)
+        ? details.map(issue => issue.message || issue.msg).join(', ')
+        : details
+    );
 
     const error = new Error(
       typeof message === 'string' && message
@@ -104,7 +108,18 @@ async function api(path, options = {}) {
     );
 
     error.status = response.status;
-    error.details = Array.isArray(data.detail) ? data.detail : [];
+    error.code = errorPayload.code;
+    error.details = Array.isArray(details) ? details : [];
+
+    if (response.status === 401 && path !== '/api/auth/login') {
+      token = null;
+      role = null;
+      localStorage.removeItem('eims_token');
+      localStorage.removeItem('eims_role');
+      setLoggedIn();
+      $('login-error').textContent =
+        'Your session has expired. Please log in again.';
+    }
 
     throw error;
 
@@ -1163,21 +1178,7 @@ async function refresh() {
         'Unable to search inventory. Please try again.';
     }
 
-    if (
-      error.message.includes('401') ||
-      error.message.includes('403')
-    ) {
-      token = null;
-      role = null;
-
-      localStorage.removeItem('eims_token');
-      localStorage.removeItem('eims_role');
-
-      setLoggedIn();
-
-      $('login-error').textContent =
-        'Your session expired. Please log in again.';
-
+    if (error.status === 401) {
       return;
     }
 

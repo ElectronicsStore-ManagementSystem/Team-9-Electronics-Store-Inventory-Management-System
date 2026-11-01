@@ -70,6 +70,18 @@ def test_unauthorized_and_forbidden_errors_use_standard_structure(
     assert_error(forbidden, "FORBIDDEN", 403)
 
 
+def test_invalid_login_returns_safe_authentication_error(client):
+    response = client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "not-the-password"},
+    )
+
+    assert_error(response, "UNAUTHORIZED", 401)
+    assert response.json()["error"]["message"] == "Invalid credentials"
+    assert "password" not in response.text.lower()
+    assert "hash" not in response.text.lower()
+
+
 def test_duplicate_conflict_uses_standard_error(client, admin_token, monkeypatch):
     def raise_duplicate(*args, **kwargs):
         raise IntegrityError("duplicate SKU", {}, Exception("duplicate"))
