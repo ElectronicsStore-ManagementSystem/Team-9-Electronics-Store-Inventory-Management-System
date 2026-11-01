@@ -1,5 +1,5 @@
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasPath, BaseModel, ConfigDict, Field, field_validator
 
 class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=80)
@@ -26,6 +26,7 @@ class SupplierResponse(BaseModel):
     id: int
     name: str
 
+
 class BranchCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
 
@@ -37,10 +38,12 @@ class BranchCreate(BaseModel):
             raise ValueError("Branch name cannot be blank.")
         return value
 
+
 class BranchResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
+
 
 class ComponentCreate(BaseModel):
     name: str = Field(
@@ -198,6 +201,7 @@ class StockMovementResponse(BaseModel):
     reason: str
     timestamp: datetime
     user_id: int
+    actor_role: str = Field(validation_alias=AliasPath("actor", "role"))
 
 
 # ---------------- PURCHASE ORDER SCHEMAS ----------------

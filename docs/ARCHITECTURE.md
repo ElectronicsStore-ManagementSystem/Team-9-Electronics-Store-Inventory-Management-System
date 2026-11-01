@@ -42,6 +42,7 @@ Responsibilities include:
 * Displaying inventory components.
 * Searching, filtering, and sorting inventory.
 * Adding and updating components.
+* Managing suppliers and loading category/supplier filter options.
 * Managing shop branches and loading category, supplier, and branch filter options.
 * Displaying stock classifications.
 * Showing dashboard information.

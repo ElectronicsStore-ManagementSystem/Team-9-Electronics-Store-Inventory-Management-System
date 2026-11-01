@@ -68,6 +68,19 @@ def create_purchase_order(client, token, components=None, quantities=None):
 
     return response
 
+
+def test_supplier_catalog_returns_ids_for_purchase_orders(client, admin_token):
+    response = client.get(
+        "/api/suppliers/catalog",
+        headers=auth(admin_token),
+    )
+
+    assert response.status_code == 200
+    suppliers = response.json()
+    names = {supplier["name"] for supplier in suppliers}
+    assert {"TechSource", "CircuitHub"} <= names
+
+
 def order_purchase_order(client, token, order_id):
     return client.patch(
         f"/api/purchase-orders/{order_id}/status",

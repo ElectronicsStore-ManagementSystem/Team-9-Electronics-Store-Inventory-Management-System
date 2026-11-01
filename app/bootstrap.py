@@ -1,4 +1,5 @@
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, select, text
+from sqlalchemy.orm import Session
 
 from .db import Base, SessionLocal, engine
 from .models import (
@@ -7,6 +8,7 @@ from .models import (
     Component,
     DowntimeIncident,
     MaintenanceWindow,
+    Supplier,
     User,
 )
 from .repositories import find_user_by_username, insert_seed_records
@@ -21,6 +23,7 @@ def seed_demo_data() -> None:
             db.commit()
 
         if find_user_by_username(db, "admin"):
+            _sync_component_suppliers(db)
             return
         users = [
             User(
@@ -64,8 +67,30 @@ def seed_demo_data() -> None:
             ),
         ]
         insert_seed_records(db, users, components)
+        _sync_component_suppliers(db)
     finally:
         db.close()
+
+
+def _sync_component_suppliers(db: Session) -> None:
+    existing_names = {
+        name.casefold()
+        for name in db.scalars(select(Supplier.normalized_name))
+    }
+
+    for name in db.scalars(select(Component.supplier).distinct()):
+        normalized_name = name.strip().casefold()
+        display_name = name.strip()
+        if display_name and normalized_name not in existing_names:
+            db.add(
+                Supplier(
+                    name=display_name,
+                    normalized_name=normalized_name,
+                )
+            )
+            existing_names.add(normalized_name)
+
+    db.commit()
 
 
 def initialize_database() -> None:

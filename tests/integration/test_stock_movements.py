@@ -94,6 +94,7 @@ def test_stock_out_decreases_component_quantity(client, admin_token):
     assert movement["reason"] == "Supplier delivery"
     assert movement["user_id"] is not None
     assert movement["timestamp"] is not None
+    assert movement["actor_role"] == "ADMIN"
 
 
 def test_stock_movement_metadata_is_recorded(client, admin_token):
@@ -121,6 +122,7 @@ def test_stock_movement_metadata_is_recorded(client, admin_token):
     assert movement["reason"] == "Supplier delivery"
     assert movement["user_id"] is not None
     assert movement["timestamp"] is not None
+    assert movement["actor_role"] == "ADMIN"
 
 def test_stock_movement_persists_in_history(client, admin_token):
     component = get_component(client, admin_token)

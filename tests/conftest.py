@@ -39,6 +39,7 @@ def clean_db():
     db.execute(delete(AvailabilityCheck))
     db.execute(delete(DowntimeIncident))
     db.execute(delete(MaintenanceWindow))
+    db.execute(delete(Supplier))
     db.execute(delete(AuditLog))
 
 # Delete parent records afterwards
