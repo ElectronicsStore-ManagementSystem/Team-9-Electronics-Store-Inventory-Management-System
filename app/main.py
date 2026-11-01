@@ -12,9 +12,10 @@ from pathlib import Path
 import io
 import uuid
 from datetime import datetime, timezone
-from fastapi import Depends, FastAPI, HTTPException, Query, File, UploadFile
+from fastapi import Depends, FastAPI, HTTPException, Query, File, UploadFile, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
@@ -63,6 +64,86 @@ from . import repositories
 
 app = FastAPI(title="EIMS API", version="1.1.0")
 logger = logging.getLogger(__name__)
+
+_ERROR_CODES = {
+    400: "BAD_REQUEST",
+    401: "UNAUTHORIZED",
+    403: "FORBIDDEN",
+    404: "NOT_FOUND",
+    409: "CONFLICT",
+    413: "PAYLOAD_TOO_LARGE",
+    415: "UNSUPPORTED_MEDIA_TYPE",
+    422: "VALIDATION_ERROR",
+    500: "INTERNAL_SERVER_ERROR",
+}
+
+
+def _error_code(status_code: int) -> str:
+    return _ERROR_CODES.get(
+        status_code,
+        "CLIENT_ERROR" if 400 <= status_code < 500 else "SERVER_ERROR",
+    )
+
+
+def _error_response(
+    status_code: int,
+    message: str,
+    *,
+    details=None,
+    headers: dict[str, str] | None = None,
+) -> JSONResponse:
+    body = {
+        "error": {
+            "code": _error_code(status_code),
+            "message": message,
+        },
+        "detail": message if details is None else details,
+    }
+    if details is not None:
+        body["error"]["details"] = details
+    return JSONResponse(status_code=status_code, content=body, headers=headers)
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    detail = exc.detail
+    message = detail if isinstance(detail, str) else "The request could not be completed."
+    details = None if isinstance(detail, str) else detail
+    return _error_response(
+        exc.status_code,
+        message,
+        details=details,
+        headers=exc.headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+):
+    details = [
+        {
+            "location": list(error["loc"]),
+            "message": error["msg"],
+            "type": error["type"],
+        }
+        for error in exc.errors()
+    ]
+    return _error_response(
+        422,
+        "Request validation failed.",
+        details=details,
+    )
+
+
+@app.exception_handler(Exception)
+async def unexpected_exception_handler(request: Request, exc: Exception):
+    return _error_response(
+        500,
+        "An unexpected server error occurred. Please try again later.",
+    )
+
 if ENFORCE_HTTPS:
     app.add_middleware(HTTPSRedirectMiddleware)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])

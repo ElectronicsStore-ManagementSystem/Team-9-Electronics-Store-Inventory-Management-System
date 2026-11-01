@@ -178,6 +178,27 @@ The application is organized into logical components:
 5. **Data Access Layer** – SQLAlchemy models and repository operations.
 6. **Persistence Layer** – SQLite database and component image storage.
 
+### API Error Handling
+
+API errors use a consistent JSON structure across inventory, authentication, and
+reporting endpoints:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request validation failed.",
+    "details": []
+  },
+  "detail": []
+}
+```
+
+The `error.code` identifies the failure category, while `error.message` is safe
+for display to clients. Validation details identify the invalid request fields.
+Unexpected server errors return a generic message without exposing implementation
+details or stack traces.
+
 For additional architectural details, refer to the [Architecture Documentation](docs/ARCHITECTURE.md).
 
 ---
