@@ -29,33 +29,32 @@ from .models import (
     Component,
     DowntimeIncident,
     MaintenanceWindow,
-    User,
     PurchaseOrder,
-   PurchaseOrderItem,
-   PurchaseOrderReceipt,
-   Supplier,
-   Component,
-   StockMovement,
+    PurchaseOrderItem,
+    PurchaseOrderReceipt,
+    StockMovement,
+    Supplier,
+    User,
 )
 from .schemas import (
+    AvailabilityResponse,
     BranchCreate,
     BranchResponse,
     ComponentCreate,
     ComponentResponse,
     ComponentUpdate,
     DashboardResponse,
-    AvailabilityResponse,
     LoginRequest,
     LoginResponse,
-    SupplierCreate,
-    SupplierResponse,
-    StockMovementCreate,
-    StockMovementResponse,
     PurchaseOrderCreate,
-    PurchaseOrderResponse,
-    PurchaseOrderStatusUpdate,
     PurchaseOrderReceive,
     PurchaseOrderReceiptResponse,
+    PurchaseOrderResponse,
+    PurchaseOrderStatusUpdate,
+    StockMovementCreate,
+    StockMovementResponse,
+    SupplierCreate,
+    SupplierResponse,
 )
 from .security import create_access_token, get_current_user, require_admin, require_manager, verify_password
 from .services import stock_status, validate_search
@@ -135,6 +134,14 @@ def get_suppliers(
     user: User = Depends(get_current_user),
 ):
     return repositories.list_suppliers(db)
+
+
+@app.get("/api/suppliers/catalog", response_model=list[SupplierResponse])
+def get_supplier_catalog(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return repositories.list_supplier_records(db)
 
 
 @app.post(

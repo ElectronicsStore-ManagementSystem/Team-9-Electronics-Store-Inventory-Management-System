@@ -70,7 +70,7 @@
     <section id="app" class="hidden">
 
       <!-- Inventory heading -->
-      <section class="inventory-section">
+      <section id="inventory-section" class="inventory-section">
         <div class="page-heading">
           <div>
             <p class="eyebrow">INVENTORY MANAGEMENT</p>
@@ -115,8 +115,14 @@
               <button id="add-btn" class="hidden management-control" type="button">
                 <span aria-hidden="true">+</span> Add component
               </button>
+              <button id="supplier-btn" class="hidden management-control" type="button">
+                Manage suppliers
+              </button>
               <button id="branch-btn" class="hidden management-control" type="button">
                 Manage branches
+              </button>
+              <button id="purchase-orders-btn" class="management-control" type="button">
+                Purchase orders
               </button>
             </div>
           </div>
@@ -318,6 +324,69 @@
           </table>
         </div>
       </section>
+
+      <section
+        id="purchase-orders-section"
+        class="purchase-orders-section table-card hidden"
+        aria-labelledby="purchase-orders-title"
+      >
+        <div class="table-heading">
+          <div>
+            <p class="eyebrow">PROCUREMENT</p>
+            <h2 id="purchase-orders-title">Purchase orders</h2>
+            <p>Create orders, track deliveries, and receive stock into inventory.</p>
+          </div>
+          <div class="purchase-orders-actions">
+            <button id="refresh-purchase-orders" class="secondary-button" type="button">
+              Refresh orders
+            </button>
+            <button id="create-purchase-order-btn" class="management-control hidden" type="button">
+              Create purchase order
+            </button>
+            <button id="close-purchase-orders" class="secondary-button" type="button">
+              Back to inventory
+            </button>
+          </div>
+        </div>
+        <p id="purchase-orders-feedback" class="purchase-orders-feedback" role="status" aria-live="polite"></p>
+        <div id="purchase-orders-list" class="purchase-orders-list" aria-live="polite">
+          <p class="empty-state">Loading purchase orders...</p>
+        </div>
+      </section>
+
+      <dialog
+        id="purchase-order-dialog"
+        class="component-dialog purchase-order-dialog"
+        aria-labelledby="purchase-order-dialog-title"
+      >
+        <div class="dialog-heading">
+          <div>
+            <p class="eyebrow">PROCUREMENT</p>
+            <h2 id="purchase-order-dialog-title">Create purchase order</h2>
+            <p>Select a supplier and add one or more components.</p>
+          </div>
+          <button id="close-purchase-order-dialog" class="secondary-button dialog-close" type="button" aria-label="Close purchase order form">
+            &times;
+          </button>
+        </div>
+        <form id="purchase-order-form" class="purchase-order-form">
+          <label for="purchase-order-supplier">Supplier</label>
+          <select id="purchase-order-supplier" name="supplier_id" required>
+            <option value="">Choose a supplier</option>
+          </select>
+          <p id="purchase-order-supplier-help" class="field-help"></p>
+          <div class="purchase-order-items-heading">
+            <h3>Order items</h3>
+            <button id="add-purchase-order-item" class="secondary-button" type="button">Add component</button>
+          </div>
+          <div id="purchase-order-items" class="purchase-order-items"></div>
+          <p id="purchase-order-form-error" class="error" role="alert"></p>
+          <div class="form-actions">
+            <button id="cancel-purchase-order" class="secondary-button" type="button">Cancel</button>
+            <button id="submit-purchase-order" type="submit">Create order</button>
+          </div>
+        </form>
+      </dialog>
 
       <dialog id="component-dialog" class="component-dialog" aria-labelledby="component-dialog-title">
         <div class="dialog-heading">
@@ -541,6 +610,37 @@
         <p id="branch-management-error" class="error" role="alert"></p>
         <h3>Shop branches</h3>
         <ul id="branch-list" class="branch-list"></ul>
+      </dialog>
+
+      <dialog id="supplier-card" class="component-dialog supplier-dialog" aria-labelledby="supplier-dialog-title">
+        <div class="form-heading">
+          <div>
+            <p class="eyebrow">CATALOG</p>
+            <h2 id="supplier-dialog-title">Manage suppliers</h2>
+            <p>Add suppliers for use in component forms and inventory filters.</p>
+          </div>
+          <button id="cancel-supplier" class="secondary-button dialog-close" type="button" aria-label="Close supplier management">
+            &times;
+          </button>
+        </div>
+        <form id="supplier-form" class="supplier-form">
+          <label for="supplier-name">Supplier name</label>
+          <div class="supplier-form-row">
+            <input
+              id="supplier-name"
+              name="name"
+              type="text"
+              maxlength="120"
+              placeholder="Enter supplier name"
+              required
+            >
+            <button type="submit">Add supplier</button>
+          </div>
+        </form>
+        <p id="supplier-feedback" class="form-feedback hidden" role="status" aria-live="polite"></p>
+        <p id="supplier-error" class="error" role="alert"></p>
+        <h3>Existing suppliers</h3>
+        <ul id="supplier-list" class="supplier-list"></ul>
       </dialog>
 
     </section>

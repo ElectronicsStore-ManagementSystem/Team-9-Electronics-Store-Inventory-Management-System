@@ -45,6 +45,19 @@ Supported HTTP methods and parameters are documented in `/docs`.
 
 Depending on the HTTP method and the user's permissions, supported operations include retrieving, updating, or deleting a component.
 
+### Stock Movement History
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/inventory/{id}/movements` | Record a stock-in or stock-out movement with a positive quantity and reason. Admins and managers only. |
+| `GET` | `/api/inventory/{id}/movements` | View the component's movement history. Any authenticated user can view it. |
+
+Use the component details dialog in the web interface to record movements or
+review the movement type, quantity, reason, timestamp, responsible user ID, and
+the responsible user's role.
+Stock quantities should be changed through the movement endpoint so each
+addition or deduction is recorded.
+
 ### Component Image Upload
 
 **Endpoint:** `/api/inventory/{id}/image`
@@ -85,6 +98,12 @@ with `POST /api/suppliers` using a JSON body containing a required `name`.
 Names are trimmed and duplicates are rejected. Existing component supplier
 values are included so current inventory remains available in filters.
 
+**Endpoint:** `/api/suppliers/catalog`
+
+Returns persisted supplier records, including IDs, for purchase-order creation.
+This is separate from `/api/suppliers`, which returns names for inventory
+filters and may include legacy supplier values from components.
+
 ### Category Options
 
 **Endpoint:** `/api/categories`
@@ -92,7 +111,25 @@ values are included so current inventory remains available in filters.
 Authenticated users can retrieve the categories used by active inventory.
 New categories appear when components are added.
 
-## 6. Stock Availability Report
+## 6. Purchase Orders
+
+Purchase orders can be created by admins and managers. Authenticated users can
+view orders and receipt history. Receiving stock and changing order status
+require manager-level access.
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| `POST` | `/api/purchase-orders` | Create an order for a supplier with component quantities. |
+| `GET` | `/api/purchase-orders` | List purchase orders. |
+| `GET` | `/api/purchase-orders/{id}` | View one order and its items. |
+| `PATCH` | `/api/purchase-orders/{id}/status` | Change an editable order to ordered or cancelled. |
+| `POST` | `/api/purchase-orders/{id}/receive` | Record full or partial delivery using an idempotency key. |
+| `GET` | `/api/purchase-orders/{id}/receipts` | View the order's receipt history. |
+
+Receiving updates inventory and records receipts in the same transaction.
+Repeated idempotency keys are rejected to prevent duplicate stock updates.
+
+## 7. Stock Availability Report
 
 **Endpoint:** `/api/reports/availability`
 
@@ -114,7 +151,7 @@ The export endpoint is:
 
 The exact supported query parameters and response formats are documented in `/docs`.
 
-## 7. Monthly System Availability Report
+## 8. Monthly System Availability Report
 
 **Endpoint:** `/api/reports/system-availability`
 
@@ -142,7 +179,7 @@ When monitoring coverage is incomplete, the response indicates that a definitive
 
 Access is subject to the application's authentication and authorization requirements.
 
-## 8. Error Handling
+## 9. Error Handling
 
 The API uses HTTP status codes to communicate request outcomes.
 
@@ -157,7 +194,7 @@ Depending on the endpoint and the type of failure, responses may indicate:
 
 Refer to `/docs` for endpoint-specific response details.
 
-## 9. Interactive Documentation
+## 10. Interactive Documentation
 
 Start the application and open:
 

@@ -2,13 +2,14 @@
 
 **Team 9 | Electronics Store Inventory Management System**
 
+**Application/API version:** `1.0.0`
+
 ## Team Members 
 
-1. Krishitha Kanakala ---PES2UG24CS234
+1. Krishitha Kanakala --PES2UG24CS234
 2. Jayashree D        --PES2UG24CS203
 3. Hemavathi E        --PES2UG24CS193
 4. Karan Maheshwari   --PES2UG24CS216
-
 
 EIMS is a web-based inventory management system designed for an electronics store. It provides inventory management, authentication, role-based access control, stock availability reporting, dashboard summaries, input validation, and automated testing.
 
@@ -30,16 +31,47 @@ The application also includes monthly system availability reporting based on mon
 * Filter inventory by category, supplier, branch, and stock status.
 * Sort inventory using supported fields and sort orders.
 * Add new components with input validation.
+* Add and view suppliers; supplier choices are shared with component forms and inventory filters.
 * Manage shop branches and assign each component to one branch.
 * Keep supplier/vendor details for components; supplier choices are shared with forms and filters.
 * Generate unique SKUs for inventory components.
-* Update component quantity, unit price, supplier, branch, and reorder level.
+* Record stock-in and stock-out operations with a reason and view each component's movement history.
+* Review movement quantities, reasons, local date and time, and the responsible user's role in a responsive history view.
+* Update component unit price, supplier, branch, and reorder level.
 * Delete components with appropriate authorization and UI confirmation.
 * Classify inventory stock into:
 
   * In stock
   * Low stock
   * Out of stock
+* Create purchase orders for suppliers, track order status and partial deliveries, and record received quantities directly in inventory.
+
+#### Component Images
+
+Admins and managers can upload PNG, JPEG, or WebP images (up to 5 MB) from a
+component's details dialog. The image file is stored in
+`uploads/components/`, and its URL is saved with the component so it appears
+again when the component is viewed later. Replacing an image removes the old
+file, and removing an image clears both the file and its saved URL.
+
+Uploaded images are runtime data and are excluded from Git. Keep the
+`uploads/components/` directory on persistent storage and include it in
+application backups; ephemeral hosting storage may be cleared when an instance
+is replaced.
+
+#### Stock Movement History
+
+Sign in and select a component in the inventory list to open its details. The
+stock movement history appears below the component information:
+
+* Admins and managers can record stock additions or deductions with a positive
+  quantity and a required reason. Each adjustment updates inventory and is
+  recorded in the history.
+* Authenticated users can view the component's movement history. Entries show
+  the movement type, quantity, reason, date and time in the browser's local
+  timezone, and the responsible user's role (for example, Admin or Manager).
+* The history is displayed as responsive cards, so it remains readable on
+  narrow screens without horizontal scrolling.
 
 ### 3. Dashboard and Inventory Insights
 
@@ -156,8 +188,7 @@ Create a virtual environment, activate it, install dependencies, and start the a
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
-$env:EIMS_ENFORCE_HTTPS = "false"
-python -m uvicorn app.main:app --reload
+python run_local.py
 ```
 
 If PowerShell blocks virtual environment activation, review your local execution policy and use an appropriate activation method for your environment.
@@ -168,12 +199,12 @@ If PowerShell blocks virtual environment activation, review your local execution
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-EIMS_ENFORCE_HTTPS=false python -m uvicorn app.main:app --reload
+python run_local.py
 ```
 
 ### Access the application
 
-By default, the development server is available at:
+The local development launcher always uses this address:
 
 `http://127.0.0.1:8000`
 
@@ -181,7 +212,9 @@ API documentation is available at:
 
 `http://127.0.0.1:8000/docs`
 
-Use the port configured for your server if you start Uvicorn with a different port.
+The launcher binds only to this computer and uses port `8000`. If that port is
+already occupied, the launcher reports an error instead of switching to another
+port. Stop the other process using port `8000` before starting the app.
 
 ## HTTPS and TLS Configuration
 
@@ -236,7 +269,9 @@ The following endpoints represent the principal documented API capabilities. Che
 | `/api/auth/login`                  | Authenticate a user and obtain an access token.                             |
 | `/api/inventory`                   | Access the inventory collection and supported inventory operations.         |
 | `/api/inventory/{id}`              | Access or modify an individual inventory component, subject to permissions. |
+| `/api/inventory/{id}/movements`    | Record or view stock movement history, subject to permissions.               |
 | `/api/dashboard`                   | Retrieve dashboard summary information.                                     |
+| `/api/purchase-orders`             | Create and track supplier orders and received stock.                         |
 | `/api/reports/availability`        | Retrieve the stock availability report.                                     |
 | `/api/reports/system-availability` | Retrieve monthly system availability information using monitoring data.     |
 
@@ -284,6 +319,13 @@ The application is organized into components responsible for:
 For the current module structure and request flow, refer to [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 For endpoint details, refer to [docs/API.md](docs/API.md) and the interactive API documentation at `/docs`.
+
+## Sprint History
+
+| Sprint | Focus |
+| ------ | ----- |
+| Sprint 1 | Initialize the EIMS project baseline. |
+| Sprint 2 | Core inventory and authentication, suppliers, purchase orders, stock movement history and UI enhancements. |
 
 ## Sprint and Git Workflow
 

@@ -18,6 +18,7 @@ class Supplier(Base):
         default=lambda: datetime.now(timezone.utc),
     )
 
+
 class Branch(Base):
     __tablename__ = "branches"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -32,6 +33,7 @@ class Branch(Base):
         DateTime,
         default=lambda: datetime.now(timezone.utc),
     )
+
 
 class User(Base):
     __tablename__ = "users"
@@ -173,6 +175,7 @@ class StockMovement(Base):
         ForeignKey("users.id"),
         nullable=False,
     )
+    actor: Mapped["User"] = relationship()
 
 class PurchaseOrder(Base):
     __tablename__ = "purchase_orders"

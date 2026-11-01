@@ -2,9 +2,19 @@ from collections.abc import Sequence
 import uuid
 
 from sqlalchemy import and_, case, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from .models import AuditLog, Branch, Component, StockMovement, Supplier, User ,PurchaseOrder,PurchaseOrderItem,PurchaseOrderReceipt
+from .models import (
+    AuditLog,
+    Branch,
+    Component,
+    PurchaseOrder,
+    PurchaseOrderItem,
+    PurchaseOrderReceipt,
+    StockMovement,
+    Supplier,
+    User,
+)
 
 def find_user_by_username(db: Session, username: str) -> User | None:
     return db.scalar(select(User).where(User.username == username))
@@ -131,6 +141,14 @@ def list_suppliers(db: Session) -> list[str]:
     return sorted(names_by_normalized.values(), key=str.casefold)
 
 
+def list_supplier_records(db: Session) -> list[Supplier]:
+    return list(
+        db.scalars(
+            select(Supplier).order_by(func.lower(Supplier.name), Supplier.id)
+        )
+    )
+
+
 def create_supplier(db: Session, name: str) -> Supplier:
     normalized_name = name.casefold()
     if any(
@@ -173,7 +191,6 @@ def find_branch_by_name(db: Session, name: str) -> Branch | None:
     return db.scalar(
         select(Branch).where(Branch.normalized_name == name.casefold())
     )
-
 
 def get_active_component(db: Session, component_id: int) -> Component | None:
     component = db.get(Component, component_id)
@@ -335,6 +352,7 @@ def create_stock_movement(
         quantity=quantity,
         reason=reason,
         user_id=user.id,
+        actor=user,
     )
 
     db.add(movement)
@@ -348,6 +366,7 @@ def list_stock_movements(
     return list(
         db.scalars(
             select(StockMovement)
+            .options(joinedload(StockMovement.actor))
             .where(StockMovement.component_id == component_id)
             .order_by(StockMovement.timestamp.desc(), StockMovement.id.desc())
         )
