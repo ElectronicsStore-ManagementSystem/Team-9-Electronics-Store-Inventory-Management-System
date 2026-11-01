@@ -325,7 +325,7 @@ For endpoint details, refer to [docs/API.md](docs/API.md) and the interactive AP
 | Sprint | Focus |
 | ------ | ----- |
 | Sprint 1 | Initialize the EIMS project baseline. |
-| Sprint 2 | Core inventory and authentication, suppliers, purchase orders, stock movement history and UI enhancements. |
+| Sprint 2 | Core inventory and authentication, suppliers, purchase orders, stock movement history, and UI enhancements. |
 
 ## Sprint and Git Workflow
 
