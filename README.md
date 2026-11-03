@@ -2,7 +2,7 @@
 
 **Team 9 | Electronics Store Inventory Management System**
 
-**Application/API version:** `1.0.0`
+**Application/API version:** `1.1.0`
 
 ## Team Members 
 
