@@ -61,7 +61,7 @@ from .services import stock_status, validate_search
 from .config import ENFORCE_HTTPS
 from . import repositories
 
-app = FastAPI(title="EIMS API", version="1.0.0")
+app = FastAPI(title="EIMS API", version="1.1.0")
 logger = logging.getLogger(__name__)
 if ENFORCE_HTTPS:
     app.add_middleware(HTTPSRedirectMiddleware)
