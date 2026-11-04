@@ -472,13 +472,13 @@ SELECT action, COUNT(*) FROM user_action_logs GROUP BY action ORDER BY action;
 
 Sample viva screenshots from the PostgreSQL validation:
 
-<img src="docs/screenshots/list-of-relations.png" alt="List of relations in PostgreSQL" width="1000" />
+<img src="docs/screenshots/list-of-relations.png" alt="List of relations in PostgreSQL" width="1000"/>
 
-<img src="docs/screenshots/users-table.png" alt="Users table in PostgreSQL" width="1000" />
+<img src="docs/screenshots/users-table.png" alt="Users table in PostgreSQL" width="1000"/>
 
-<img src="docs/screenshots/audit-logs.png" alt="Audit logs table in PostgreSQL" width="1000" />
+<img src="docs/screenshots/audit-logs.png" alt="Audit logs table in PostgreSQL" width="1000"/>
 
-<img src="docs/screenshots/components-table.png" alt="Components table in PostgreSQL" width="1000" />
+<img src="docs/screenshots/components-table.png" alt="Components table in PostgreSQL" width="1000"/>
 
 The API equivalents are `GET /api/users` and `GET /api/user-action-logs`, both
 restricted to the Super Admin. Existing component audit logs remain available
