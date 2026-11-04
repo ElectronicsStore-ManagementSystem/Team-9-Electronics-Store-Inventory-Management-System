@@ -4,9 +4,11 @@
 
 **Application Version:** `1.1.0`
 
-EIMS is a web-based Electronics Store Inventory Management System developed to simplify and streamline inventory operations for an electronics retail business. The application provides centralized inventory management, supplier and branch management, purchase order processing, stock movement tracking, reporting, authentication, and role-based access control.
+EIMS is a web-based Electronics Store Inventory Management System designed to simplify and streamline inventory operations for electronics retail businesses.
 
-The system is built using **FastAPI, SQLAlchemy, SQLite, HTML, CSS, and JavaScript**, with automated testing through Pytest and continuous integration through GitHub Actions.
+The application provides centralized inventory management, supplier and branch management, purchase order processing, stock movement tracking, reporting, authentication, role-based access control, and audit logging.
+
+Built using **Python, FastAPI, SQLAlchemy, SQLite/PostgreSQL, HTML, CSS, and JavaScript**, EIMS focuses on secure inventory operations, maintainable architecture, and reliable application functionality.
 
 ---
 
@@ -30,9 +32,10 @@ The primary objectives of EIMS are to:
 - Manage suppliers, branches, and purchase orders.
 - Track stock additions and deductions.
 - Provide inventory insights through dashboards and reports.
-- Enforce secure authentication and role-based access.
-- Improve operational visibility through audit logging and system availability monitoring.
-- Maintain software quality through automated testing and continuous integration.
+- Enforce secure authentication and role-based access control.
+- Maintain audit trails for important system operations.
+- Monitor system availability and downtime.
+- Improve software quality through automated testing and continuous integration.
 
 ---
 
@@ -42,6 +45,7 @@ The primary objectives of EIMS are to:
 
 - User authentication for protected application functionality.
 - Role-based permissions for Admin, Manager, and Staff users.
+- Super Admin account provisioning and account management.
 - Restricted inventory operations according to assigned permissions.
 - Token-based authentication and session handling.
 - Authorization checks for protected API endpoints.
@@ -107,13 +111,12 @@ Uploaded images are runtime data and are excluded from Git. Persistent storage a
 
 ### 3.8 Stock Availability Reporting
 
+**API endpoint:** `GET /api/reports/availability`
+
 The stock availability report provides information about the current inventory status of active components.
 
-**API endpoint:**
+It includes:
 
-`GET /api/reports/availability`
-
-The report includes:
 - Component quantities.
 - Stock classifications.
 - Current inventory availability information.
@@ -123,13 +126,12 @@ Supported export formats include PDF, Excel, and CSV where available in the appl
 
 ### 3.9 Monthly System Availability Reporting
 
+**API endpoint:** `GET /api/reports/system-availability`
+
 The monthly system availability feature provides a report for a selected month and year using recorded monitoring information.
 
-**API endpoint:**
-
-`GET /api/reports/system-availability`
-
 The report considers:
+
 - Recorded system availability checks.
 - Monitoring coverage.
 - Downtime incidents.
@@ -147,6 +149,7 @@ Incomplete or unavailable monitoring data is handled explicitly rather than pres
 - Role-based restrictions.
 - HTTPS enforcement and TLS configuration support.
 - Audit logging for supported operations.
+- Persistent user action logs.
 - Security-focused automated tests.
 
 ---
@@ -158,12 +161,14 @@ Incomplete or unavailable monitoring data is handled explicitly rather than pres
 | Programming Language | Python |
 | Backend Framework | FastAPI |
 | ORM | SQLAlchemy |
-| Database | SQLite |
+| Databases | SQLite, PostgreSQL |
+| PostgreSQL Driver | psycopg |
 | Frontend | HTML, CSS, JavaScript |
 | Testing Framework | Pytest |
 | Coverage Measurement | pytest-cov |
 | Test Reporting | pytest-html |
 | API Documentation | FastAPI Swagger UI |
+| Containerization | Docker |
 | Version Control | Git, GitHub |
 | Continuous Integration | GitHub Actions |
 
@@ -176,12 +181,13 @@ The application is organized into logical components:
 3. **Security Layer** – Authentication and authorization.
 4. **Business Logic Layer** – Inventory, suppliers, branches, stock movements, purchase orders, and reporting.
 5. **Data Access Layer** – SQLAlchemy models and repository operations.
-6. **Persistence Layer** – SQLite database and component image storage.
+6. **Persistence Layer** – SQLite or PostgreSQL database and component image storage.
 
 ### API Error Handling
 
-API errors use a consistent JSON structure across inventory, authentication, and
-reporting endpoints:
+API errors use a consistent JSON structure across supported endpoints.
+
+Example:
 
 ```json
 {
@@ -194,10 +200,7 @@ reporting endpoints:
 }
 ```
 
-The `error.code` identifies the failure category, while `error.message` is safe
-for display to clients. Validation details identify the invalid request fields.
-Unexpected server errors return a generic message without exposing implementation
-details or stack traces.
+The `error.code` identifies the failure category, while `error.message` is safe for display to clients. Validation details identify invalid request fields. Unexpected server errors return a generic message without exposing implementation details or stack traces.
 
 For additional architectural details, refer to the [Architecture Documentation](docs/ARCHITECTURE.md).
 
@@ -220,11 +223,10 @@ The project documentation is maintained in the `docs/` directory.
 
 ### 5.2 Testing and Quality Assurance Reports
 
-The following reports document the execution and quality measurements of the application.
-
 | Report | Description |
 |---|---|
 | [Unit Testing Report](docs/reports/9_Unit_Testing_Report.pdf) | Unit test cases and execution results |
+| [Integration Testing Report](docs/reports/9_Integration_Test_Report.pdf) | Integration test execution results |
 | [System Validation Report](docs/reports/9_System_Validation_Report.pdf) | Integration, security, scalability, and system validation results |
 | [Code Coverage Report](docs/reports/9_Code_Coverage_Report.pdf) | Statement and line coverage measurements |
 | [Branch Coverage Report](docs/reports/9_Branch_Coverage_Report.pdf) | Branch-aware coverage measurements |
@@ -237,7 +239,7 @@ EIMS uses automated unit, integration, security, and system-level tests to verif
 
 ### 6.1 Test Execution Results
 
-The complete project test suite was executed using Pytest.
+The recorded complete project test execution reported:
 
 | Metric | Result |
 |---|---:|
@@ -322,7 +324,7 @@ The CI workflow installs project dependencies and executes the Pytest test suite
 - Git.
 - PowerShell on Windows or a compatible terminal on macOS/Linux.
 
-### Clone the Repository
+### Step 1: Clone the Repository
 
 ```bash
 git clone https://github.com/ElectronicsStore-ManagementSystem/Team-9-Electronics-Store-Inventory-Management-System.git
@@ -330,7 +332,7 @@ git clone https://github.com/ElectronicsStore-ManagementSystem/Team-9-Electronic
 cd Team-9-Electronics-Store-Inventory-Management-System
 ```
 
-### Create a Virtual Environment
+### Step 2: Create a Virtual Environment
 
 **Windows PowerShell**
 
@@ -346,19 +348,19 @@ python -m venv .venv
 source .venv/bin/activate
 ```
 
-### Install Dependencies
+### Step 3: Install Dependencies
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-### Start the Application
+### Step 4: Start the Application
 
 ```bash
 python run_local.py
 ```
 
-### Access the Application
+### Step 5: Access the Application
 
 | Resource | Address |
 |---|---|
@@ -369,7 +371,123 @@ The local development launcher uses port `8000` and binds to the local machine.
 
 ---
 
-## 8. HTTPS and TLS Configuration
+## 8. Database Configuration
+
+EIMS supports SQLite and PostgreSQL through SQLAlchemy.
+
+### 8.1 SQLite
+
+SQLite is the default database configuration.
+
+The application uses the following default database URL:
+
+```text
+sqlite:///./eims.db
+```
+
+No separate database server is required for local SQLite development.
+
+### 8.2 PostgreSQL Setup
+
+PostgreSQL can be used by configuring the `EIMS_DATABASE_URL` environment variable.
+
+#### Step 1: Start PostgreSQL
+
+One option is to run PostgreSQL using Docker:
+
+```powershell
+docker run --name eims-postgres `
+  -e POSTGRES_USER=eims `
+  -e POSTGRES_PASSWORD=eims-viva-password `
+  -e POSTGRES_DB=eims `
+  -p 5432:5432 -d postgres:16
+```
+
+#### Step 2: Configure the Database Connection
+
+```powershell
+$env:EIMS_DATABASE_URL = "postgresql+psycopg://eims:eims-viva-password@localhost:5432/eims"
+```
+
+#### Step 3: Configure Super Admin Credentials
+
+```powershell
+$env:EIMS_SUPER_ADMIN_USERNAME = "eims-admin"
+$env:EIMS_SUPER_ADMIN_PASSWORD = "your-strong-password"
+```
+
+For local development, HTTPS enforcement can be disabled:
+
+```powershell
+$env:EIMS_ENFORCE_HTTPS = "false"
+```
+
+#### Step 4: Start the Application
+
+```powershell
+python -m uvicorn app.main:app --reload
+```
+
+### 8.3 PostgreSQL Database Verification
+
+Connect to the PostgreSQL database:
+
+```powershell
+docker exec -it eims-postgres psql -U eims -d eims
+```
+
+Useful PostgreSQL commands:
+
+```sql
+\dt
+
+\d users
+
+\d user_action_logs
+
+SELECT id, username, role, active
+FROM users
+ORDER BY id;
+
+SELECT timestamp, username, role, action, resource, details
+FROM user_action_logs
+ORDER BY timestamp DESC;
+
+SELECT action, COUNT(*)
+FROM user_action_logs
+GROUP BY action
+ORDER BY action;
+
+\q
+```
+
+### 8.4 PostgreSQL Validation Screenshots
+
+The following screenshots document PostgreSQL database validation and table inspection.
+
+**Database Relations**
+
+![PostgreSQL List of Relations](docs/screenshots/list-of-relations.png)
+
+**Users Table**
+
+![PostgreSQL Users Table](docs/screenshots/users-table.png)
+
+**Audit Logs Table**
+
+![PostgreSQL Audit Logs Table](docs/screenshots/audit-logs.png)
+
+**Components Table**
+
+![PostgreSQL Components Table](docs/screenshots/components-table.png)
+
+The API equivalents are `GET /api/users` and `GET /api/user-action-logs`, both restricted to the Super Admin.
+
+Existing component audit logs remain available to Admin and Manager users through `GET /api/audit-logs`.
+
+---
+
+## 9. HTTPS and TLS Configuration
 
 The application supports HTTPS enforcement and a dedicated TLS launcher.
 
@@ -401,7 +519,7 @@ python run_https.py
 
 ---
 
-## 9. API Endpoints
+## 10. API Endpoints
 
 The following table lists the principal documented API capabilities.
 
@@ -415,82 +533,37 @@ The following table lists the principal documented API capabilities.
 | `/api/purchase-orders` | Create and manage purchase orders |
 | `/api/reports/availability` | Retrieve stock availability information |
 | `/api/reports/system-availability` | Retrieve monthly system availability information |
+| `/api/users` | Manage user accounts, subject to authorization |
+| `/api/user-action-logs` | Retrieve persistent user action logs |
+| `/api/audit-logs` | Retrieve component audit logs |
 
-### Demo accounts
-
-| Role  | Username | Password      |
-| ----- | -------- | ------------- |
-| Admin | `admin`  | `Admin@12345` |
-| Super Admin | `eims-admin` | `Password` |
-| Staff | `staff`  | `Staff@12345` |
-
-The Super Admin can create Staff, Manager, and Admin accounts through
-`POST /api/users`. User action history is available at
-`GET /api/user-action-logs`. Do not use the documented demo password in
-production; set `EIMS_SUPER_ADMIN_PASSWORD` to a strong secret.
-
-## PostgreSQL setup
-
-The application supports PostgreSQL through SQLAlchemy. Install dependencies
-with `python -m pip install -r requirements.txt`, then start PostgreSQL locally
-or with Docker:
-
-```powershell
-docker run --name eims-postgres `
-  -e POSTGRES_USER=eims `
-  -e POSTGRES_PASSWORD=eims-viva-password `
-  -e POSTGRES_DB=eims `
-  -p 5432:5432 -d postgres:16
-```
-
-Configure the application before starting it:
-
-```powershell
-$env:EIMS_DATABASE_URL = "postgresql+psycopg://eims:eims-viva-password@localhost:5432/eims"
-$env:EIMS_SUPER_ADMIN_USERNAME = "eims-admin"
-$env:EIMS_SUPER_ADMIN_PASSWORD = "Password"
-$env:EIMS_ENFORCE_HTTPS = "false"
-python -m uvicorn app.main:app --reload
-```
-
-Useful PostgreSQL commands:
-
-```powershell
-docker exec -it eims-postgres psql -U eims -d eims
-```
-
-```sql
-\dt
-\d users
-\d user_action_logs
-SELECT id, username, role, active FROM users ORDER BY id;
-SELECT timestamp, username, role, action, resource, details
-FROM user_action_logs ORDER BY timestamp DESC;
-SELECT action, COUNT(*) FROM user_action_logs GROUP BY action ORDER BY action;
-\q
-```
-
-Sample viva screenshots from the PostgreSQL validation:
-
-<img src="docs/screenshots/list-of-relations.png" alt="List of relations in PostgreSQL" width="1000"/>
-
-<img src="docs/screenshots/users-table.png" alt="Users table in PostgreSQL" width="1000"/>
-
-<img src="docs/screenshots/audit-logs.png" alt="Audit logs table in PostgreSQL" width="1000"/>
-
-<img src="docs/screenshots/components-table.png" alt="Components table in PostgreSQL" width="1000"/>
-
-The API equivalents are `GET /api/users` and `GET /api/user-action-logs`, both
-restricted to the Super Admin. Existing component audit logs remain available
-to Admin and Manager users through `GET /api/audit-logs`.
-
-For the complete endpoint specifications, request schemas, response formats, and authorization requirements, refer to the [API documentation](docs/API.md) or the interactive Swagger UI.
+For the complete endpoint specifications, request schemas, response formats, and authorization requirements, refer to [API Documentation](docs/API.md) or the interactive Swagger UI.
 
 ---
 
-## 10. Running Tests
+## 11. Demo Accounts
 
-Activate the virtual environment and run the complete test suite:
+The following credentials are intended for local demonstration environments where these accounts have been provisioned.
+
+| Role | Username | Password |
+|---|---|---|
+| Admin | `admin` | `Admin@12345` |
+| Super Admin | `eims-admin` | `Password` |
+| Staff | `staff` | `Staff@12345` |
+
+The Super Admin can create Staff, Manager, and Admin accounts through `POST /api/users`.
+
+User action history is available at `GET /api/user-action-logs`.
+
+**Security note:** These are demonstration credentials. Do not use the documented passwords in production. Configure a strong `EIMS_SUPER_ADMIN_PASSWORD` and secure all account credentials through environment variables or an appropriate secrets-management system.
+
+---
+
+## 12. Running Tests
+
+Activate the virtual environment before executing the tests.
+
+### Run the Complete Test Suite
 
 ```bash
 pytest -q
@@ -547,7 +620,7 @@ start branch_htmlcov/index.html
 
 ---
 
-## 11. Sprint History
+## 13. Sprint History
 
 The project was developed incrementally through two development sprints.
 
@@ -565,7 +638,7 @@ The project was developed incrementally through two development sprints.
 
 ---
 
-## 12. Git and Collaboration Workflow
+## 14. Git and Collaboration Workflow
 
 The project uses GitHub for source-code management, issue tracking, pull requests, and team collaboration.
 
@@ -610,7 +683,7 @@ ci: configure GitHub Actions workflow
 
 ---
 
-## 13. Repository Structure
+## 15. Repository Structure
 
 The repository is organized into application source code, tests, documentation, configuration, and supporting assets.
 
@@ -630,22 +703,32 @@ Team-9-Electronics-Store-Inventory-Management-System/
 │   ├── security.py
 │   └── services.py
 │
+├── backend/
+│
+├── branch_htmlcov/
+│
 ├── docs/
 │   ├── reports/
-│   │   ├── 9_Unit_Testing_Report.pdf
-│   │   ├── 9_System_Validation_Report.pdf
+│   │   ├── 9_Branch_Coverage_Report.pdf
 │   │   ├── 9_Code_Coverage_Report.pdf
-│   │   └── 9_Branch_Coverage_Report.pdf
+│   │   ├── 9_Integration_Test_Report.pdf
+│   │   ├── 9_System_Validation_Report.pdf
+│   │   └── 9_Unit_Testing_Report.pdf
 │   │
-│   ├── 9_SRS.pdf
+│   ├── screenshots/
+│   │   ├── audit-logs.png
+│   │   ├── components-table.png
+│   │   ├── list-of-relations.png
+│   │   └── users-table.png
+│   │
 │   ├── 9_SRS_updated.pdf
-│   ├── 9_SAD.pd
 │   ├── 9_SAD_updated.pdf
-│   ├── 9_TestPlan.pdf
 │   ├── 9_TestPlan_updated.pdf
 │   ├── UML_diagram.png
 │   ├── API.md
 │   └── ARCHITECTURE.md
+│
+├── frontend/
 │
 ├── tests/
 │   ├── integration/
@@ -661,6 +744,7 @@ Team-9-Electronics-Store-Inventory-Management-System/
 │   └── workflows/
 │       └── ci.yml
 │
+├── uploads/
 ├── T9_Sprint1_Video.mp4
 ├── T9_Sprint2_Video.mp4
 ├── requirements.txt
@@ -671,7 +755,7 @@ Team-9-Electronics-Store-Inventory-Management-System/
 
 ---
 
-## 14. Future Scope
+## 16. Future Scope
 
 Potential future enhancements include:
 
@@ -685,12 +769,13 @@ Potential future enhancements include:
 
 ---
 
-## 15. Project Information
+## 17. Project Information
 
 **Project:** Electronics Store Inventory Management System (EIMS)  
 **Team:** Team 9  
 **Institution:** PES University  
 **Application Version:** 1.1.0  
+
 **Repository:** [Team-9-Electronics-Store-Inventory-Management-System](https://github.com/ElectronicsStore-ManagementSystem/Team-9-Electronics-Store-Inventory-Management-System)
 
 Developed collaboratively by Team 9 as part of the Software Engineering academic project.

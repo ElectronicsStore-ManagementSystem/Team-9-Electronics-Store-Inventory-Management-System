@@ -1,15 +1,32 @@
+# Python virtual environment
 .venv/
+
+# Python cache files
 __pycache__/
-.pytest_cache/
 *.py[cod]
+
+# Pytest
+.pytest_cache/
+
+# Database files
 *.db
 *.sqlite3
+
+# Environment variables and secrets
 .env
-.env.example
+.env.*
+!.env.example
+
+# Coverage reports
 .coverage
 htmlcov/
+branch_htmlcov/
+
+# IDE and editor settings
 .idea/
 .vscode/
+
+# Operating system files
 .DS_Store
 
 # Uploaded component images (runtime files)
@@ -17,7 +34,15 @@ uploads/components/*
 !uploads/components/.gitkeep
 
 # Documents and generated reports
-*.pdf 
-*.doc 
+# Ignore generated PDF and Word documents
+*.pdf
+*.doc
 *.docx
-docs/
+
+# Keep project documentation in Git
+# Ignore rules for generated documents above still apply
+!docs/
+!docs/**/
+
+# Keep PostgreSQL validation screenshots
+!docs/screenshots/*.png
