@@ -9,8 +9,10 @@ from .models import (
     DowntimeIncident,
     MaintenanceWindow,
     Supplier,
+    UserActionLog,
     User,
 )
+from .config import SUPER_ADMIN_PASSWORD, SUPER_ADMIN_USERNAME
 from .repositories import find_user_by_username, insert_seed_records
 from .security import hash_password
 def seed_demo_data() -> None:
@@ -20,6 +22,16 @@ def seed_demo_data() -> None:
             normalized_name="main branch"
         ).first():
             db.add(Branch(name="Main Branch", normalized_name="main branch"))
+            db.commit()
+
+        if find_user_by_username(db, SUPER_ADMIN_USERNAME) is None:
+            db.add(
+                User(
+                    username=SUPER_ADMIN_USERNAME,
+                    password_hash=hash_password(SUPER_ADMIN_PASSWORD),
+                    role="SUPER_ADMIN",
+                )
+            )
             db.commit()
 
         if find_user_by_username(db, "admin"):

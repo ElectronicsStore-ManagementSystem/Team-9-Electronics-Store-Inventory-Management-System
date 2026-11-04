@@ -12,6 +12,19 @@ class LoginResponse(BaseModel):
     role: str
 
 
+class UserCreate(BaseModel):
+    username: str = Field(min_length=3, max_length=80)
+    password: str = Field(min_length=8, max_length=128)
+    role: str = Field(pattern="^(ADMIN|MANAGER|STAFF)$")
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    role: str
+    active: bool
+
+
 class SupplierCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
 
@@ -47,6 +60,19 @@ class BranchResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     name: str
+
+
+class UserCreate(BaseModel):
+    username: str = Field(min_length=3, max_length=80)
+    password: str = Field(min_length=8, max_length=128)
+    role: str = Field(pattern="^(ADMIN|MANAGER|STAFF)$")
+
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    role: str
+    active: bool
 
 
 class ComponentCreate(BaseModel):

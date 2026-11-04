@@ -97,6 +97,26 @@ class AuditLog(Base):
     )
 
 
+class UserActionLog(Base):
+    __tablename__ = "user_action_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=True,
+    )
+    username: Mapped[str] = mapped_column(String(80), nullable=False)
+    role: Mapped[str] = mapped_column(String(20), nullable=False)
+    action: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    resource: Mapped[str] = mapped_column(String(120), nullable=False)
+    details: Mapped[str] = mapped_column(Text, default="")
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        index=True,
+    )
+
+
 class AvailabilityCheck(Base):
     __tablename__ = "availability_checks"
 

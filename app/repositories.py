@@ -15,11 +15,45 @@ from .models import (
     StockMovement,
     Supplier,
     User,
+    UserActionLog,
 )
 
 
 def find_user_by_username(db: Session, username: str) -> User | None:
     return db.scalar(select(User).where(User.username == username))
+
+
+def create_user_action_log(
+    db: Session,
+    *,
+    user: User | None,
+    action: str,
+    resource: str,
+    details: str = "",
+) -> None:
+    db.add(
+        UserActionLog(
+            user_id=user.id if user else None,
+            username=user.username if user else "anonymous",
+            role=user.role if user else "ANONYMOUS",
+            action=action,
+            resource=resource,
+            details=details,
+        )
+    )
+    db.commit()
+
+
+def list_user_action_logs(db: Session) -> list[UserActionLog]:
+    return list(
+        db.scalars(
+            select(UserActionLog).order_by(UserActionLog.timestamp.desc())
+        )
+    )
+
+
+def list_users(db: Session) -> list[User]:
+    return list(db.scalars(select(User).order_by(User.username)))
 
 
 def insert_seed_records(

@@ -22,6 +22,7 @@ from app.models import (
     PurchaseOrder,
     PurchaseOrderItem,
     PurchaseOrderReceipt,
+    UserActionLog,
 )
 
 @pytest.fixture(autouse=True)
@@ -41,6 +42,7 @@ def clean_db():
     db.execute(delete(MaintenanceWindow))
     db.execute(delete(Supplier))
     db.execute(delete(AuditLog))
+    db.execute(delete(UserActionLog))
 
 # Delete parent records afterwards
     db.execute(delete(Supplier))

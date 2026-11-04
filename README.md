@@ -416,6 +416,64 @@ The following table lists the principal documented API capabilities.
 | `/api/reports/availability` | Retrieve stock availability information |
 | `/api/reports/system-availability` | Retrieve monthly system availability information |
 
+### Demo accounts
+
+| Role  | Username | Password      |
+| ----- | -------- | ------------- |
+| Admin | `admin`  | `Admin@12345` |
+| Super Admin | `eims-admin` | `Password` |
+| Staff | `staff`  | `Staff@12345` |
+
+The Super Admin can create Staff, Manager, and Admin accounts through
+`POST /api/users`. User action history is available at
+`GET /api/user-action-logs`. Do not use the documented demo password in
+production; set `EIMS_SUPER_ADMIN_PASSWORD` to a strong secret.
+
+## PostgreSQL setup and viva commands
+
+The application supports PostgreSQL through SQLAlchemy. Install dependencies
+with `python -m pip install -r requirements.txt`, then start PostgreSQL locally
+or with Docker:
+
+```powershell
+docker run --name eims-postgres `
+  -e POSTGRES_USER=eims `
+  -e POSTGRES_PASSWORD=eims-viva-password `
+  -e POSTGRES_DB=eims `
+  -p 5432:5432 -d postgres:16
+```
+
+Configure the application before starting it:
+
+```powershell
+$env:EIMS_DATABASE_URL = "postgresql+psycopg://eims:eims-viva-password@localhost:5432/eims"
+$env:EIMS_SUPER_ADMIN_USERNAME = "eims-admin"
+$env:EIMS_SUPER_ADMIN_PASSWORD = "Password"
+$env:EIMS_ENFORCE_HTTPS = "false"
+python -m uvicorn app.main:app --reload
+```
+
+Useful PostgreSQL commands for a viva:
+
+```powershell
+docker exec -it eims-postgres psql -U eims -d eims
+```
+
+```sql
+\dt
+\d users
+\d user_action_logs
+SELECT id, username, role, active FROM users ORDER BY id;
+SELECT timestamp, username, role, action, resource, details
+FROM user_action_logs ORDER BY timestamp DESC;
+SELECT action, COUNT(*) FROM user_action_logs GROUP BY action ORDER BY action;
+\q
+```
+
+The API equivalents are `GET /api/users` and `GET /api/user-action-logs`, both
+restricted to the Super Admin. Existing component audit logs remain available
+to Admin and Manager users through `GET /api/audit-logs`.
+
 For the complete endpoint specifications, request schemas, response formats, and authorization requirements, refer to the [API documentation](docs/API.md) or the interactive Swagger UI.
 
 ---

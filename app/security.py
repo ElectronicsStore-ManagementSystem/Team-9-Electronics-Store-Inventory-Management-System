@@ -125,15 +125,24 @@ def get_current_user(
     return user
 
 def require_manager(user: User = Depends(get_current_user)) -> User:
-    if user.role not in {"ADMIN", "MANAGER"}:
+    if user.role not in {"SUPER_ADMIN", "ADMIN", "MANAGER"}:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Manager/Admin role required")
     return user
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role != "ADMIN":
+    if user.role not in {"SUPER_ADMIN", "ADMIN"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin role required",
+        )
+    return user
+
+
+def require_super_admin(user: User = Depends(get_current_user)) -> User:
+    if user.role != "SUPER_ADMIN":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super Admin role required",
         )
     return user

@@ -56,8 +56,18 @@ from .schemas import (
     StockMovementResponse,
     SupplierCreate,
     SupplierResponse,
+    UserCreate,
+    UserResponse,
 )
-from .security import create_access_token, get_current_user, require_admin, require_manager, verify_password
+from .security import (
+    create_access_token,
+    get_current_user,
+    hash_password,
+    require_admin,
+    require_manager,
+    require_super_admin,
+    verify_password,
+)
 from .services import stock_status, validate_search
 from .config import ENFORCE_HTTPS
 from . import repositories
@@ -183,12 +193,61 @@ def health():
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = repositories.find_user_by_username(db, payload.username.strip())
     if not user or not user.active or not verify_password(payload.password, user.password_hash):
+        repositories.create_user_action_log(
+            db,
+            user=None,
+            action="LOGIN_FAILED",
+            resource="/api/auth/login",
+            details="Invalid credentials",
+        )
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     user.last_activity = datetime.now(timezone.utc)
     db.commit()
+    repositories.create_user_action_log(
+        db,
+        user=user,
+        action="LOGIN_SUCCESS",
+        resource="/api/auth/login",
+    )
 
     return LoginResponse(access_token=create_access_token(user), role=user.role)
+
+
+@app.post("/api/users", response_model=UserResponse, status_code=201)
+def create_user(
+    payload: UserCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_super_admin),
+):
+    username = payload.username.strip()
+    if repositories.find_user_by_username(db, username):
+        raise HTTPException(status_code=409, detail="Username already exists")
+
+    account = User(
+        username=username,
+        password_hash=hash_password(payload.password),
+        role=payload.role,
+    )
+    db.add(account)
+    db.commit()
+    db.refresh(account)
+    repositories.create_user_action_log(
+        db,
+        user=user,
+        action="CREATE_USER",
+        resource=f"/api/users/{account.id}",
+        details=f"Created {account.role} account {account.username}",
+    )
+    return account
+
+
+@app.get("/api/users", response_model=list[UserResponse])
+def list_users(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_super_admin),
+):
+    return repositories.list_users(db)
 @app.get("/api/me")
 def me(user: User = Depends(get_current_user)):
     return {"id": user.id, "username": user.username, "role": user.role}
@@ -196,7 +255,7 @@ def me(user: User = Depends(get_current_user)):
 
 def component_response_data(component: Component, user: User) -> dict:
     data = ComponentResponse.model_validate(component).model_dump()
-    if user.role != "ADMIN":
+    if user.role not in {"SUPER_ADMIN", "ADMIN"}:
         data["created_at"] = None
     return data
 
@@ -321,7 +380,7 @@ def list_inventory(
             branch=branch,
             status=status,
             sort=sort,
-            allow_date_sort=user.role == "ADMIN",
+            allow_date_sort=user.role in {"SUPER_ADMIN", "ADMIN"},
             limit=limit,
             offset=offset,
         )
@@ -1064,6 +1123,27 @@ def dashboard(
 def audit_logs(db: Session = Depends(get_db), user: User = Depends(require_manager)):
     rows = repositories.list_audit_logs(db)
     return [{"id": r.id, "user_id": r.user_id, "action": r.action, "component_id": r.component_id, "component_name": r.component_name, "details": r.details, "timestamp": r.timestamp} for r in rows]
+
+
+@app.get("/api/user-action-logs")
+def user_action_logs(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_super_admin),
+):
+    rows = repositories.list_user_action_logs(db)
+    return [
+        {
+            "id": row.id,
+            "user_id": row.user_id,
+            "username": row.username,
+            "role": row.role,
+            "action": row.action,
+            "resource": row.resource,
+            "details": row.details,
+            "timestamp": row.timestamp,
+        }
+        for row in rows
+    ]
 
 
 # ---------------- PURCHASE ORDER APIs ----------------

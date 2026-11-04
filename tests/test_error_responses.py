@@ -82,6 +82,54 @@ def test_invalid_login_returns_safe_authentication_error(client):
     assert "hash" not in response.text.lower()
 
 
+def test_super_admin_can_create_accounts_and_view_user_action_logs(client):
+    login = client.post(
+        "/api/auth/login",
+        json={"username": "eims-admin", "password": "Password"},
+    )
+    assert login.status_code == 200
+    headers = auth(login.json()["access_token"])
+
+    created = client.post(
+        "/api/users",
+        json={
+            "username": "viva-staff",
+            "password": "VivaStaff1",
+            "role": "STAFF",
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201
+    assert created.json()["role"] == "STAFF"
+
+    logs = client.get("/api/user-action-logs", headers=headers)
+    assert logs.status_code == 200
+    assert any(
+        row["action"] == "CREATE_USER"
+        and row["username"] == "eims-admin"
+        for row in logs.json()
+    )
+
+
+def test_regular_admin_cannot_create_accounts_or_view_user_action_logs(
+    client, admin_token
+):
+    headers = auth(admin_token)
+    create_response = client.post(
+        "/api/users",
+        json={
+            "username": "not-allowed",
+            "password": "VivaStaff1",
+            "role": "STAFF",
+        },
+        headers=headers,
+    )
+    logs_response = client.get("/api/user-action-logs", headers=headers)
+
+    assert create_response.status_code == 403
+    assert logs_response.status_code == 403
+
+
 def test_duplicate_conflict_uses_standard_error(client, admin_token, monkeypatch):
     def raise_duplicate(*args, **kwargs):
         raise IntegrityError("duplicate SKU", {}, Exception("duplicate"))

@@ -134,39 +134,39 @@ function setLoggedIn() {
   $('login-card').classList.toggle('hidden', !!token);
   $('app').classList.toggle('hidden', !token);
   $('logout').classList.toggle('hidden', !token);
-  $('availability-report').classList.toggle('hidden', role !== 'ADMIN');
+  $('availability-report').classList.toggle('hidden', !['SUPER_ADMIN', 'ADMIN'].includes(role));
   const dateSortOption = $('sort-by').querySelector('[data-admin-only]');
-  dateSortOption.hidden = role !== 'ADMIN';
-  dateSortOption.disabled = role !== 'ADMIN';
+  dateSortOption.hidden = !['SUPER_ADMIN', 'ADMIN'].includes(role);
+  dateSortOption.disabled = !['SUPER_ADMIN', 'ADMIN'].includes(role);
 
-  if (role !== 'ADMIN' && $('sort-by').value === 'date_added') {
+  if (!['SUPER_ADMIN', 'ADMIN'].includes(role) && $('sort-by').value === 'date_added') {
     $('sort-by').value = 'id';
   }
 
   $('add-btn').classList.toggle(
     'hidden',
-    !['ADMIN', 'MANAGER'].includes(role)
+    !['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(role)
   );
   $('supplier-btn').classList.toggle(
     'hidden',
-    !['ADMIN', 'MANAGER'].includes(role)
+    !['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(role)
   );
   $('branch-btn').classList.toggle(
     'hidden',
-    !['ADMIN', 'MANAGER'].includes(role)
+    !['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(role)
   );
   $('create-purchase-order-btn').classList.toggle(
     'hidden',
-    !['ADMIN', 'MANAGER'].includes(role)
+    !['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(role)
   );
   const isStaff = role === 'STAFF';
   $('dashboard-role').textContent = isStaff
     ? 'Staff · Read-only view'
-    : `${role === 'ADMIN' ? 'Admin' : 'Manager'} · Full view`;
+    : `${role === 'SUPER_ADMIN' ? 'Super Admin' : role === 'ADMIN' ? 'Admin' : 'Manager'} · Full view`;
   $('dashboard-description').textContent = isStaff
     ? 'Review inventory, stock levels, and shop branches. Changes require a manager.'
     : 'Track components and manage stock across shop branches.';
-  $('quick-start-add-step').innerHTML = ['ADMIN', 'MANAGER'].includes(role)
+  $('quick-start-add-step').innerHTML = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(role)
     ? '<strong>Add it:</strong> choose <strong>Add component</strong> and complete the form.'
     : '<strong>Add it:</strong> ask a manager to add new stock; you can search and review components here.';
 
@@ -1138,7 +1138,7 @@ async function refresh() {
         'out-of-stock': 'Out of stock'
       }[stockStatus];
 
-      const action = ['ADMIN', 'MANAGER'].includes(role)
+      const action = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(role)
         ? `<button class="management-control" onclick="removeItem(${component.id})">Delete</button>`
         : '<span class="read-only-label">Read only</span>';
 
@@ -1391,7 +1391,7 @@ function renderComponentDetails(component) {
     'low-stock': 'Low stock',
     'out-of-stock': 'Out of stock'
   }[stockStatus];
-  const dateAdded = role === 'ADMIN' && component.created_at
+  const dateAdded = ['SUPER_ADMIN', 'ADMIN'].includes(role) && component.created_at
       ? `
         <div class="detail-item">
           <dt>Date added</dt>
@@ -1402,10 +1402,10 @@ function renderComponentDetails(component) {
         </div>
       `
       : '';
-  const editButton = ['ADMIN', 'MANAGER'].includes(role)
+  const editButton = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(role)
     ? '<button class="details-edit-button" type="button" data-edit-component>Edit details</button>'
     : '';
-  const movementForm = ['ADMIN', 'MANAGER'].includes(role)
+  const movementForm = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(role)
     ? `
       <form id="stock-movement-form" class="stock-movement-form">
         <div class="stock-movement-form-heading">
@@ -1453,7 +1453,7 @@ function renderComponentDetails(component) {
     `
     : '<p class="no-component-image">No image uploaded yet.</p>';
 
-  const imageUploadSection = ['ADMIN', 'MANAGER'].includes(role)
+  const imageUploadSection = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(role)
     ? `
       <form id="component-image-form" class="component-image-form">
         <label for="component-image-file">
@@ -1710,7 +1710,7 @@ async function loadPurchaseOrders() {
       ? ''
       : 'Add a supplier using Manage suppliers before creating a purchase order.';
     $('create-purchase-order-btn').disabled =
-      !['ADMIN', 'MANAGER'].includes(role) ||
+      !['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(role) ||
       suppliers.length === 0 ||
       components.length === 0;
   } catch (error) {
@@ -1760,7 +1760,7 @@ function renderPurchaseOrders() {
         </li>
       `;
     }).join('');
-    const canManage = ['ADMIN', 'MANAGER'].includes(role);
+    const canManage = ['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(role);
     const statusActions = canManage && order.status === 'DRAFT'
       ? `
         <button class="purchase-order-action" type="button" data-action="status" data-status="ORDERED" data-order-id="${order.id}">Mark ordered</button>
@@ -2118,7 +2118,7 @@ deleteConfirmationDialog.close();
 }
 
 window.removeItem = async id => {
-if (!['ADMIN', 'MANAGER'].includes(role)) {
+if (!['SUPER_ADMIN', 'ADMIN', 'MANAGER'].includes(role)) {
 alert('You do not have permission to delete components.');
 return;
 }
