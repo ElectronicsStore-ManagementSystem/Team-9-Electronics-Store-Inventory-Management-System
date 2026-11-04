@@ -429,7 +429,7 @@ The Super Admin can create Staff, Manager, and Admin accounts through
 `GET /api/user-action-logs`. Do not use the documented demo password in
 production; set `EIMS_SUPER_ADMIN_PASSWORD` to a strong secret.
 
-## PostgreSQL setup and viva commands
+## PostgreSQL setup
 
 The application supports PostgreSQL through SQLAlchemy. Install dependencies
 with `python -m pip install -r requirements.txt`, then start PostgreSQL locally
@@ -453,7 +453,7 @@ $env:EIMS_ENFORCE_HTTPS = "false"
 python -m uvicorn app.main:app --reload
 ```
 
-Useful PostgreSQL commands for a viva:
+Useful PostgreSQL commands:
 
 ```powershell
 docker exec -it eims-postgres psql -U eims -d eims
@@ -469,6 +469,16 @@ FROM user_action_logs ORDER BY timestamp DESC;
 SELECT action, COUNT(*) FROM user_action_logs GROUP BY action ORDER BY action;
 \q
 ```
+
+Sample viva screenshots from the PostgreSQL validation:
+
+<img src="docs/screenshots/list-of-relations.png" alt="List of relations in PostgreSQL" width="1000" />
+
+<img src="docs/screenshots/users-table.png" alt="Users table in PostgreSQL" width="1000" />
+
+<img src="docs/screenshots/audit-logs.png" alt="Audit logs table in PostgreSQL" width="1000" />
+
+<img src="docs/screenshots/components-table.png" alt="Components table in PostgreSQL" width="1000" />
 
 The API equivalents are `GET /api/users` and `GET /api/user-action-logs`, both
 restricted to the Super Admin. Existing component audit logs remain available
