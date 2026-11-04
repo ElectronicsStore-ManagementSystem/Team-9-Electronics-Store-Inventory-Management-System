@@ -1,224 +1,356 @@
 # Electronics Store Inventory Management System (EIMS)
 
-**Team 9 | Electronics Store Inventory Management System**
+**Team 9 | Software Engineering Project | PES University**
 
-**Application/API version:** `1.1.0`
+**Application Version:** `1.1.0`
 
-## Team Members 
+EIMS is a web-based Electronics Store Inventory Management System developed to simplify and streamline inventory operations for an electronics retail business. The application provides centralized inventory management, supplier and branch management, purchase order processing, stock movement tracking, reporting, authentication, and role-based access control.
 
-1. Krishitha Kanakala --PES2UG24CS234
-2. Jayashree D        --PES2UG24CS203
-3. Hemavathi E        --PES2UG24CS193
-4. Karan Maheshwari   --PES2UG24CS216
+The system is built using **FastAPI, SQLAlchemy, SQLite, HTML, CSS, and JavaScript**, with automated testing through Pytest and continuous integration through GitHub Actions.
 
-EIMS is a web-based inventory management system designed for an electronics store. It provides inventory management, authentication, role-based access control, stock availability reporting, dashboard summaries, input validation, and automated testing.
+---
 
-The application also includes monthly system availability reporting based on monitoring checks, downtime incidents, and scheduled maintenance.
+## 1. Team Members
 
-## Project Scope and Features
+| No. | Team Member | University ID | GitHub |
+|---|---|---|---|
+| 1 | Krishitha Kankanala | PES2UG24CS234 | [@krista9669](https://github.com/krista9669) |
+| 2 | Jayashree D | PES2UG24CS203 | [@Jayashree-D-CSE](https://github.com/Jayashree-D-CSE) |
+| 3 | Hemavathi E | PES2UG24CS193 | [@Hema3156](https://github.com/Hema3156) |
+| 4 | Karan Maheshwari | PES2UG24CS216 | [@Progamer24](https://github.com/Progamer24) |
 
-### 1. Authentication and Role-Based Access Control
+---
 
-* User authentication before accessing protected inventory functions.
-* Role-based access control for Admin, Manager, and Staff users.
-* Restricted inventory operations according to user permissions.
-* Session handling using authentication tokens.
+## 2. Project Objectives
 
-### 2. Inventory Management
+The primary objectives of EIMS are to:
 
-* List and view inventory components.
-* Search components by supported fields.
-* Filter inventory by category, supplier, branch, and stock status.
-* Sort inventory using supported fields and sort orders.
-* Add new components with input validation.
-* Add and view suppliers; supplier choices are shared with component forms and inventory filters.
-* Manage shop branches and assign each component to one branch.
-* Keep supplier/vendor details for components; supplier choices are shared with forms and filters.
-* Generate unique SKUs for inventory components.
-* Record stock-in and stock-out operations with a reason and view each component's movement history.
-* Review movement quantities, reasons, local date and time, and the responsible user's role in a responsive history view.
-* Update component unit price, supplier, branch, and reorder level.
-* Delete components with appropriate authorization and UI confirmation.
-* Classify inventory stock into:
+- Digitize electronics store inventory operations.
+- Maintain accurate component and stock information.
+- Manage suppliers, branches, and purchase orders.
+- Track stock additions and deductions.
+- Provide inventory insights through dashboards and reports.
+- Enforce secure authentication and role-based access.
+- Improve operational visibility through audit logging and system availability monitoring.
+- Maintain software quality through automated testing and continuous integration.
 
-  * In stock
-  * Low stock
-  * Out of stock
-* Create purchase orders for suppliers, track order status and partial deliveries, and record received quantities directly in inventory.
+---
 
-#### Component Images
+## 3. Features and Functionalities
 
-Admins and managers can upload PNG, JPEG, or WebP images (up to 5 MB) from a
-component's details dialog. The image file is stored in
-`uploads/components/`, and its URL is saved with the component so it appears
-again when the component is viewed later. Replacing an image removes the old
-file, and removing an image clears both the file and its saved URL.
+### 3.1 Authentication and Role-Based Access Control
 
-Uploaded images are runtime data and are excluded from Git. Keep the
-`uploads/components/` directory on persistent storage and include it in
-application backups; ephemeral hosting storage may be cleared when an instance
-is replaced.
+- User authentication for protected application functionality.
+- Role-based permissions for Admin, Manager, and Staff users.
+- Restricted inventory operations according to assigned permissions.
+- Token-based authentication and session handling.
+- Authorization checks for protected API endpoints.
 
-#### Stock Movement History
+### 3.2 Inventory Management
 
-Sign in and select a component in the inventory list to open its details. The
-stock movement history appears below the component information:
+- Create, view, update, and delete inventory components.
+- Search components using supported fields.
+- Filter inventory by category, supplier, branch, and stock status.
+- Sort inventory using supported fields and sort orders.
+- Generate unique SKUs for inventory components.
+- Update unit prices, supplier details, branch assignments, and reorder levels.
+- Validate inventory fields and numeric inputs.
+- Classify stock into:
+  - In Stock
+  - Low Stock
+  - Out of Stock
 
-* Admins and managers can record stock additions or deductions with a positive
-  quantity and a required reason. Each adjustment updates inventory and is
-  recorded in the history.
-* Authenticated users can view the component's movement history. Entries show
-  the movement type, quantity, reason, date and time in the browser's local
-  timezone, and the responsible user's role (for example, Admin or Manager).
-* The history is displayed as responsive cards, so it remains readable on
-  narrow screens without horizontal scrolling.
+### 3.3 Supplier and Branch Management
 
-### 3. Dashboard and Inventory Insights
+- Add and manage suppliers.
+- Maintain supplier information for inventory components.
+- Manage store branches.
+- Assign inventory components to branches.
+- Reuse supplier and branch information across component forms and inventory filters.
 
-* Display inventory summary information.
-* Show total component count and total stock value.
-* Display low-stock information.
-* Provide recently added component information.
-* Visualize inventory summaries and trends where supported by available data.
-* Switch between persistent light and dark themes across the application.
+### 3.4 Stock Movement Management
 
-### 4. Stock Availability Reporting
+- Record stock-in and stock-out operations.
+- Require positive movement quantities and reasons.
+- Automatically update inventory quantities.
+- Maintain stock movement history for individual components.
+- Display movement type, quantity, reason, date, time, and responsible user's role.
+- Provide a responsive stock movement history interface.
+
+### 3.5 Purchase Order Management
+
+- Create purchase orders for suppliers.
+- Track purchase order status.
+- Support partial and complete order receiving.
+- Record received quantities.
+- Update inventory based on received stock.
+- Maintain purchase order information for inventory operations.
+
+### 3.6 Component Image Management
+
+- Upload component images in PNG, JPEG, and WebP formats.
+- Enforce a maximum upload size of 5 MB.
+- Replace or remove existing component images.
+- Store image files in `uploads/components/`.
+- Persist image references with component records.
+
+Uploaded images are runtime data and are excluded from Git. Persistent storage and appropriate backups are required for deployments.
+
+### 3.7 Dashboard and Inventory Insights
+
+- Display inventory summary information.
+- Show total component count and total stock value.
+- Display low-stock information.
+- Show recently added components.
+- Visualize inventory summaries and trends where supported.
+- Support persistent light and dark theme preferences.
+
+### 3.8 Stock Availability Reporting
 
 The stock availability report provides information about the current inventory status of active components.
 
-The report API is:
+**API endpoint:**
 
-`/api/reports/availability`
+`GET /api/reports/availability`
 
-The report supports inventory availability information, including component quantities and stock classifications.
+The report includes:
+- Component quantities.
+- Stock classifications.
+- Current inventory availability information.
+- Exclusion of inactive components.
 
-Integration tests cover stock classifications, updated inventory values, and the exclusion of inactive components.
+Supported export formats include PDF, Excel, and CSV where available in the application.
 
-Supported report export formats include PDF, Excel, and CSV where available in the application.
+### 3.9 Monthly System Availability Reporting
 
-### 5. Monthly System Availability Reporting
+The monthly system availability feature provides a report for a selected month and year using recorded monitoring information.
 
-The monthly system availability feature provides a report for a selected month and year using recorded monitoring data.
+**API endpoint:**
 
-The report API is:
+`GET /api/reports/system-availability`
 
-`/api/reports/system-availability`
+The report considers:
+- Recorded system availability checks.
+- Monitoring coverage.
+- Downtime incidents.
+- Scheduled maintenance periods.
+- Calculated availability percentage when sufficient data is available.
+- Comparison against the configured availability target of 99.5%.
 
-The report evaluates:
+Incomplete or unavailable monitoring data is handled explicitly rather than presenting an unsupported availability result.
 
-* Recorded system availability checks.
-* Monitoring coverage for the selected month.
-* Downtime incidents.
-* Scheduled maintenance periods.
-* Calculated availability percentage when sufficient monitoring data is available.
-* Comparison against the configured availability target of 99.5%.
+### 3.10 Validation, Security, and Auditability
 
-When monitoring data is unavailable, the endpoint returns a response indicating that no monitoring checks were recorded for the selected month.
+- Required-field and numeric input validation.
+- Structured API error responses.
+- Authentication and authorization for protected operations.
+- Role-based restrictions.
+- HTTPS enforcement and TLS configuration support.
+- Audit logging for supported operations.
+- Security-focused automated tests.
 
-When monitoring coverage is incomplete, the report indicates that a definitive availability result cannot be established from the available data.
+---
 
-Scheduled maintenance is handled separately from unplanned downtime when calculating availability.
+## 4. Technology Stack
 
-Access to this report is restricted according to the application's authentication and authorization rules.
+| Category | Technologies |
+|---|---|
+| Programming Language | Python |
+| Backend Framework | FastAPI |
+| ORM | SQLAlchemy |
+| Database | SQLite |
+| Frontend | HTML, CSS, JavaScript |
+| Testing Framework | Pytest |
+| Coverage Measurement | pytest-cov |
+| Test Reporting | pytest-html |
+| API Documentation | FastAPI Swagger UI |
+| Version Control | Git, GitHub |
+| Continuous Integration | GitHub Actions |
 
-### 6. Validation and Error Handling
+### Application Architecture
 
-* Validate required component fields.
-* Validate numeric values such as quantity, unit price, and reorder level.
-* Provide appropriate error responses for invalid input.
-* Display validation feedback in the frontend.
-* Handle unsuccessful API requests and authentication failures.
+The application is organized into logical components:
 
-### 7. Security and Auditability
+1. **Presentation Layer** – HTML, CSS, and JavaScript frontend.
+2. **Application Layer** – FastAPI routes and request handling.
+3. **Security Layer** – Authentication and authorization.
+4. **Business Logic Layer** – Inventory, suppliers, branches, stock movements, purchase orders, and reporting.
+5. **Data Access Layer** – SQLAlchemy models and repository operations.
+6. **Persistence Layer** – SQLite database and component image storage.
 
-* Authentication for protected API endpoints.
-* Role-based authorization for restricted operations.
-* Input validation and error handling.
-* HTTPS enforcement by default, with a separate HTTPS launcher for TLS deployments.
-* Audit logging for supported operations.
+For additional architectural details, refer to the [Architecture Documentation](docs/ARCHITECTURE.md).
 
-### 8. Automated Testing and Continuous Integration
+---
 
-* Unit tests for supported business logic.
-* Integration tests for API endpoints.
-* Tests for authentication and authorization.
-* Tests for inventory operations and validation.
-* Tests for stock availability reporting.
-* Integration tests for monthly system availability reporting.
-* GitHub Actions CI pipeline, if configured in the repository.
+## 5. Project Documentation
 
-The project uses automated tests to verify application behavior and help prevent regressions as new features are introduced.
+The project documentation is maintained in the `docs/` directory.
 
-## Technology Stack
+### 5.1 Software Engineering Documents
 
-* **Language:** Python
-* **Backend framework:** FastAPI
-* **ORM:** SQLAlchemy
-* **Development database:** SQLite
-* **Testing framework:** Pytest
-* **Frontend:** HTML, CSS, and JavaScript
-* **API documentation:** FastAPI Swagger UI
-* **Version control:** Git and GitHub
-* **Continuous integration:** GitHub Actions, if configured
+| Document | Description |
+|---|---|
+| [Software Requirements Specification (SRS)](docs/9_SRS_updated.pdf) | Functional and non-functional requirements, constraints, and acceptance criteria |
+| [Software Architecture Document (SAD)](docs/9_SAD_updated.pdf) | Application architecture, components, workflows, and design decisions |
+| [Software Test Plan](docs/9_TestPlan_updated.pdf) | Testing strategy, test cases, and requirements traceability |
+| [UML Component Diagram](docs/UML_diagram.png) | Visual representation of the application's component architecture |
+| [Architecture Documentation](docs/ARCHITECTURE.md) | Module responsibilities and application structure |
+| [API Documentation](docs/API.md) | API endpoints, request handling, and response details |
 
-The application separates frontend functionality, HTTP API endpoints, business logic, and persistence operations.
+### 5.2 Testing and Quality Assurance Reports
 
-For additional details, see:
+The following reports document the execution and quality measurements of the application.
 
-* [Architecture and module responsibilities](docs/ARCHITECTURE.md)
-* [API reference](docs/API.md)
+| Report | Description |
+|---|---|
+| [Unit Testing Report](docs/reports/9_Unit_Testing_Report.pdf) | Unit test cases and execution results |
+| [System Validation Report](docs/reports/9_System_Validation_Report.pdf) | Integration, security, scalability, and system validation results |
+| [Code Coverage Report](docs/reports/9_Code_Coverage_Report.pdf) | Statement and line coverage measurements |
+| [Branch Coverage Report](docs/reports/9_Branch_Coverage_Report.pdf) | Branch-aware coverage measurements |
 
-## Prerequisites
+---
 
-Before running the application, install:
+## 6. Testing and Quality Assurance
 
-* Python 3.12 or a compatible version supported by the project's dependencies.
-* Git, if cloning the repository.
-* PowerShell on Windows, or a compatible terminal on macOS/Linux.
+EIMS uses automated unit, integration, security, and system-level tests to verify application functionality.
 
-Install the dependencies listed in `requirements.txt` before starting the application.
+### 6.1 Test Execution Results
 
-## Run Locally
+The complete project test suite was executed using Pytest.
 
-### Windows PowerShell
+| Metric | Result |
+|---|---:|
+| Total tests executed | 181 |
+| Passed | 181 |
+| Failed | 0 |
+| Overall test pass rate | 100% |
+| Execution environment | Python 3.12.7 |
+| Testing framework | Pytest 8.3.5 |
 
-Create a virtual environment, activate it, install dependencies, and start the application:
+### 6.2 Unit Testing
+
+Selected unit test modules cover:
+
+- Dashboard summary functionality.
+- Inventory validation.
+- Stock classification.
+- Unique SKU generation.
+- Stock value calculations.
+- Search input handling.
+- Password hashing and verification.
+- Password security validation.
+
+**Recorded result:** 13 tests passed.
+
+### 6.3 System Validation
+
+System validation covers integrated application functionality, including:
+
+- Authentication and authorization.
+- Branch management.
+- Component image management.
+- Purchase order processing.
+- Stock movement management.
+- Supplier management.
+- Reporting APIs.
+- System availability reporting.
+- Security and role permissions.
+- Scalability and transport security checks.
+
+**Recorded result:** 98 tests passed.
+
+### 6.4 Code Coverage
+
+Line coverage was measured using `pytest-cov`.
+
+| Metric | Result |
+|---|---:|
+| Statements | 1,139 |
+| Missed statements | 172 |
+| Line coverage | **85%** |
+
+### 6.5 Branch Coverage
+
+Branch-aware coverage was measured using the coverage tool with branch measurement enabled.
+
+| Metric | Result |
+|---|---:|
+| Branch opportunities | 250 |
+| Partially covered branch points | 53 |
+| Combined statement-and-branch coverage | **83%** |
+
+The 83% value represents combined coverage reported by the tool, not a separately calculated branch-only percentage.
+
+### 6.6 Continuous Integration
+
+The project uses GitHub Actions to execute automated tests when changes are pushed to the repository.
+
+The CI workflow installs project dependencies and executes the Pytest test suite.
+
+**Latest recorded CI status:** Successful.
+
+[View GitHub Actions](https://github.com/ElectronicsStore-ManagementSystem/Team-9-Electronics-Store-Inventory-Management-System/actions)
+
+---
+
+## 7. Installation and Setup
+
+### Prerequisites
+
+- Python 3.12 or a compatible version supported by the project dependencies.
+- Git.
+- PowerShell on Windows or a compatible terminal on macOS/Linux.
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/ElectronicsStore-ManagementSystem/Team-9-Electronics-Store-Inventory-Management-System.git
+
+cd Team-9-Electronics-Store-Inventory-Management-System
+```
+
+### Create a Virtual Environment
+
+**Windows PowerShell**
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-python run_local.py
 ```
 
-If PowerShell blocks virtual environment activation, review your local execution policy and use an appropriate activation method for your environment.
-
-### macOS/Linux
+**macOS/Linux**
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
+```
+
+### Install Dependencies
+
+```bash
 python -m pip install -r requirements.txt
+```
+
+### Start the Application
+
+```bash
 python run_local.py
 ```
 
-### Access the application
+### Access the Application
 
-The local development launcher always uses this address:
+| Resource | Address |
+|---|---|
+| Local Application | http://127.0.0.1:8000 |
+| Interactive API Documentation | http://127.0.0.1:8000/docs |
 
-`http://127.0.0.1:8000`
+The local development launcher uses port `8000` and binds to the local machine.
 
-API documentation is available at:
+---
 
-`http://127.0.0.1:8000/docs`
+## 8. HTTPS and TLS Configuration
 
-The launcher binds only to this computer and uses port `8000`. If that port is
-already occupied, the launcher reports an error instead of switching to another
-port. Stop the other process using port `8000` before starting the app.
-
-## HTTPS and TLS Configuration
-
-The application redirects HTTP requests to HTTPS by default.
+The application supports HTTPS enforcement and a dedicated TLS launcher.
 
 For local development, HTTPS enforcement can be disabled using:
 
@@ -226,124 +358,152 @@ For local development, HTTPS enforcement can be disabled using:
 $env:EIMS_ENFORCE_HTTPS = "false"
 ```
 
-For HTTPS/TLS deployments, provide a certificate and private key and start the dedicated TLS launcher.
+For TLS deployment, configure a certificate and private key.
 
-### Windows PowerShell
+**Windows PowerShell:**
 
 ```powershell
 $env:EIMS_TLS_CERTFILE = "C:\path\to\certificate.pem"
 $env:EIMS_TLS_KEYFILE = "C:\path\to\private-key.pem"
+
 python run_https.py
 ```
 
-### Deployment considerations
+### Deployment Considerations
 
-* Configure a valid TLS certificate and private key.
-* Use TLS 1.2 or later.
-* When deploying behind a reverse proxy, configure the proxy to redirect HTTP requests to HTTPS.
-* Configure the proxy to forward only HTTPS traffic to the application.
-* Keep private keys and production secrets outside version control.
-* Use secure, deployment-specific credentials rather than development demo credentials.
+- Configure a valid TLS certificate and private key.
+- Use TLS 1.2 or later.
+- Keep production credentials and private keys outside version control.
+- Use secure, deployment-specific credentials.
+- Configure persistent storage for uploaded component images.
+- Configure HTTPS redirection appropriately when using a reverse proxy.
 
-## Demo Accounts
+---
 
-The application may create demo accounts during initial startup or database initialization, depending on the configured initialization process.
+## 9. API Endpoints
 
-The documented development credentials are:
+The following table lists the principal documented API capabilities.
 
-| Role  | Username | Password      |
-| ----- | -------- | ------------- |
-| Admin | `admin`  | `Admin@12345` |
-| Staff | `staff`  | `Staff@12345` |
+| Endpoint | Purpose |
+|---|---|
+| `/api/auth/login` | Authenticate users and obtain an access token |
+| `/api/inventory` | Access and manage inventory collections |
+| `/api/inventory/{id}` | Access or modify an individual component |
+| `/api/inventory/{id}/movements` | Record or view stock movement history |
+| `/api/dashboard` | Retrieve dashboard summaries |
+| `/api/purchase-orders` | Create and manage purchase orders |
+| `/api/reports/availability` | Retrieve stock availability information |
+| `/api/reports/system-availability` | Retrieve monthly system availability information |
 
-These credentials are for development and testing only. Verify that they are configured in your local environment before using them.
+For the complete endpoint specifications, request schemas, response formats, and authorization requirements, refer to the [API documentation](docs/API.md) or the interactive Swagger UI.
 
-**Do not use demo credentials in a production deployment.** Configure secure credentials before deploying the application.
+---
 
-## API Endpoints
+## 10. Running Tests
 
-The following endpoints represent the principal documented API capabilities. Check the API documentation at `/docs` for the current request parameters, response schemas, and authorization requirements.
-
-| Endpoint                           | Purpose                                                                     |
-| ---------------------------------- | --------------------------------------------------------------------------- |
-| `/api/auth/login`                  | Authenticate a user and obtain an access token.                             |
-| `/api/inventory`                   | Access the inventory collection and supported inventory operations.         |
-| `/api/inventory/{id}`              | Access or modify an individual inventory component, subject to permissions. |
-| `/api/inventory/{id}/movements`    | Record or view stock movement history, subject to permissions.               |
-| `/api/dashboard`                   | Retrieve dashboard summary information.                                     |
-| `/api/purchase-orders`             | Create and track supplier orders and received stock.                         |
-| `/api/reports/availability`        | Retrieve the stock availability report.                                     |
-| `/api/reports/system-availability` | Retrieve monthly system availability information using monitoring data.     |
-
-The available HTTP methods and authorization requirements depend on the specific endpoint.
-
-## Run Tests
-
-Activate the project's virtual environment and run the complete test suite from the repository root:
+Activate the virtual environment and run the complete test suite:
 
 ```bash
 pytest -q
 ```
 
-### Run Monthly System Availability Tests
+### Run Unit Tests
+
+```bash
+pytest tests/unit tests/test_unit_services.py tests/test_unit_security.py -v
+```
+
+### Run Integration Tests
+
+```bash
+pytest tests/integration -v
+```
+
+### Run Security Tests
+
+```bash
+pytest tests/security -v
+```
+
+### Run System Availability Tests
 
 ```bash
 pytest -q tests/integration/test_system_availability.py
 ```
 
-These tests cover authentication, authorization, invalid date parameters, missing monitoring data, availability calculations, scheduled maintenance handling, and incomplete monitoring coverage.
-
 ### Run Scalability Tests
-
-The scalability regression test can be executed separately:
 
 ```bash
 pytest -q tests/test_scalability.py
 ```
 
-The test is intended to exercise inventory handling with a large dataset and concurrent paginated requests.
+### Generate Code Coverage
 
-Test results may vary as new tests and features are added. Run the current test suite to obtain the latest results.
+```bash
+pytest --cov=app --cov-report=term-missing --cov-report=html:htmlcov --cov-report=xml:coverage.xml
+```
 
-## Project Architecture
+### Generate Branch-Aware Coverage
 
-The application is organized into components responsible for:
+```bash
+pytest --cov=app --cov-branch --cov-report=term-missing --cov-report=html:branch_htmlcov
+```
 
-* Frontend user interaction.
-* HTTP API routes and request handling.
-* Authentication and authorization.
-* Inventory and reporting business logic.
-* Database models and persistence.
-* Unit and integration testing.
+Open the generated HTML reports:
 
-For the current module structure and request flow, refer to [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+```powershell
+start htmlcov/index.html
+start branch_htmlcov/index.html
+```
 
-For endpoint details, refer to [docs/API.md](docs/API.md) and the interactive API documentation at `/docs`.
+---
 
-## Sprint History
+## 11. Sprint History
 
-| Sprint | Focus |
-| ------ | ----- |
-| Sprint 1 | Initialize the EIMS project baseline. |
-| Sprint 2 | Core inventory and authentication, suppliers, purchase orders, stock movement history, and UI enhancements. |
+The project was developed incrementally through two development sprints.
 
-## Sprint and Git Workflow
+| Sprint | Duration | Focus |
+|---|---|---|
+| Sprint 1 | October 19–25, 2026 | Core inventory functionality, dashboard, charts, low-stock alerts, and foundational application features |
+| Sprint 2 | October 26–November 1, 2026 | Bug fixes, remaining SRS requirements, security and validation improvements, stock movement history, purchase order management, supplier and branch functionality, and documentation |
 
-The `main` branch is the integration branch. Team members should work on separate feature branches and open pull requests for review.
+### Sprint Demonstrations
 
-Do not commit directly to `main`.
+| Sprint | Demonstration |
+|---|---|
+| Sprint 1 | [View Sprint 1 Video](T9_Sprint1_Video.mp4) |
+| Sprint 2 | [View Sprint 2 Video](T9_Sprint2_Video.mp4) |
+
+---
+
+## 12. Git and Collaboration Workflow
+
+The project uses GitHub for source-code management, issue tracking, pull requests, and team collaboration.
+
+The `main` branch serves as the integration branch.
+
+### Development Workflow
+
+1. Create a feature branch.
+2. Implement the assigned feature or fix.
+3. Run relevant tests locally.
+4. Commit changes using descriptive commit messages.
+5. Push the feature branch.
+6. Open a pull request targeting `main`.
+7. Review changes and address feedback.
+8. Merge approved changes into the integration branch.
 
 ### Example Branch Names
 
 ```text
-feature/karan-auth-api
-feature/krishitha-inventory-api
-test/jayashree-integration-tests
-qa/hemavathi-ci-security
-feature/issue-22-system-availability
+feature/inventory-management
+feature/authentication
+feature/purchase-orders
+feature/stock-movement-history
+test/integration-coverage
+fix/api-validation
+docs/project-documentation
 ```
-
-Use descriptive branch names that match the assigned task or issue.
 
 ### Commit Message Examples
 
@@ -351,43 +511,97 @@ Use descriptive branch names that match the assigned task or issue.
 feat(auth): add login and role middleware
 feat(inventory): add component CRUD endpoints
 feat(inventory): generate unique SKUs
+feat(purchase-orders): add partial receiving
 test(inventory): add CRUD integration coverage
 test(reports): cover monthly system availability
-fix(frontend): correct initialization order for login
-ci: add GitHub Actions test pipeline
-docs: update project README
+fix(frontend): correct initialization order
+docs: update project documentation
+ci: configure GitHub Actions workflow
 ```
 
-Each team member should configure their own Git name and email and commit their own contributions. Do not fabricate author identity in commits.
+---
 
-### Pull Request Workflow
+## 13. Repository Structure
 
-1. Create a feature branch from the appropriate base branch.
-2. Implement the assigned changes.
-3. Run relevant tests locally.
-4. Review the changes before committing.
-5. Push the feature branch to GitHub.
-6. Open a pull request targeting `main`.
-7. Describe the changes and testing performed.
-8. Resolve review feedback and merge according to the team's workflow.
+The repository is organized into application source code, tests, documentation, configuration, and supporting assets.
 
-Keep pull requests focused on the assigned issue or feature whenever possible.
+```text
+Team-9-Electronics-Store-Inventory-Management-System/
+│
+├── app/
+│   ├── monitoring/
+│   ├── __init__.py
+│   ├── bootstrap.py
+│   ├── config.py
+│   ├── db.py
+│   ├── main.py
+│   ├── models.py
+│   ├── repositories.py
+│   ├── schemas.py
+│   ├── security.py
+│   └── services.py
+│
+├── docs/
+│   ├── reports/
+│   │   ├── 9_Unit_Testing_Report.pdf
+│   │   ├── 9_System_Validation_Report.pdf
+│   │   ├── 9_Code_Coverage_Report.pdf
+│   │   └── 9_Branch_Coverage_Report.pdf
+│   │
+│   ├── 9_SRS.pdf
+│   ├── 9_SRS_updated.pdf
+│   ├── 9_SAD.pd
+│   ├── 9_SAD_updated.pdf
+│   ├── 9_TestPlan.pdf
+│   ├── 9_TestPlan_updated.pdf
+│   ├── UML_diagram.png
+│   ├── API.md
+│   └── ARCHITECTURE.md
+│
+├── tests/
+│   ├── integration/
+│   ├── security/
+│   ├── unit/
+│   ├── test_integration_api.py
+│   ├── test_scalability.py
+│   ├── test_transport_security.py
+│   ├── test_unit_security.py
+│   └── test_unit_services.py
+│
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+│
+├── T9_Sprint1_Video.mp4
+├── T9_Sprint2_Video.mp4
+├── requirements.txt
+├── run_local.py
+├── run_https.py
+└── README.md
+```
 
-## Future Improvements
+---
 
-Potential improvements depend on the project roadmap and the features approved for subsequent sprints. These may include:
+## 14. Future Scope
 
-* Expanded reporting and export capabilities.
-* Additional dashboard analytics.
-* More comprehensive monitoring and availability tracking.
-* Further security hardening.
-* Additional automated tests.
-* Performance and scalability improvements.
+Potential future enhancements include:
 
-Only mark a feature as completed once its implementation and behavior have been verified.
+- Expanded inventory analytics and reporting.
+- Additional dashboard visualizations.
+- Advanced supplier and purchase order analytics.
+- More comprehensive monitoring and availability tracking.
+- Further security hardening.
+- Additional automated test scenarios.
+- Performance optimization and scalability improvements.
 
-## Team
+---
 
-**Team 9 — Electronics Store Inventory Management System**
+## 15. Project Information
 
-This project is developed collaboratively by the team as part of the academic software engineering project.
+**Project:** Electronics Store Inventory Management System (EIMS)  
+**Team:** Team 9  
+**Institution:** PES University  
+**Application Version:** 1.1.0  
+**Repository:** [Team-9-Electronics-Store-Inventory-Management-System](https://github.com/ElectronicsStore-ManagementSystem/Team-9-Electronics-Store-Inventory-Management-System)
+
+Developed collaboratively by Team 9 as part of the Software Engineering academic project.
